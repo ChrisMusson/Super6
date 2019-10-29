@@ -121,12 +121,6 @@ def main():
     formula_off_by_four_plus = "= SUM(ARRAYFORMULA(N(IFERROR(ABS(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 4) - Results!A2:A) + ABS(OFFSET(Predictions!B2:B, 0, 2 * COLUMN() - 4) - Results!B2:B) >= 4, FALSE))))"
     wks.update_row(12, [formula_off_by_four_plus] * num_players, 1)
 
-    # model_cell = pygsheets.Cell("B7")
-    # model_cell.format = (pygsheets.FormatType.NUMBER, "00.00")
-
-    # format_range = wks.range("B7:8")
-    # format_range.apply_format(model_cell)
-
     ss.add_worksheet(title="Table", rows=num_players + 1, cols=12)
     wks = ss.worksheet_by_title("Table")
     wks.update_value(
