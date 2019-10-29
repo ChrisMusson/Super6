@@ -6,8 +6,11 @@ An example of what an up-to-date version of this looks like with formatting can 
 
 # Requirements:
 A valid Google account
+
 Selenium
+
 pygsheets
+
 pandas
 
 # Usage
