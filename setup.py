@@ -1,60 +1,62 @@
-league_ID = ""
+from login import login
+import requests
+from bs4 import BeautifulSoup
+import json
+import csv
+import pygsheets
+import pandas as pd
+
 username = ""
 pin = ""
+league_id = ""
 spreadsheet_name = ""
 
 
 def main():
-    from selenium import webdriver
-    from login import login
-    import json
-    import csv
-    import pygsheets
-    import pandas as pd
+    with requests.Session() as s:
+        login(s, username, pin)
+        league_page = s.get(
+            "https://super6.skysports.com/league/{}/season".format(league_id))
 
-    driver = webdriver.Chrome()
-    login(driver=driver, username=username, pin=pin)
+    soup = BeautifulSoup(league_page.content, "lxml")
+    rows = soup.find_all("table")[1].find_all("tr")
 
-    driver.get("https://super6.skysports.com/league/{}/season".format(league_ID))
+    names = [str(row.div)[5:-6].title() for row in rows[1:]]
+    IDs = [row["data-dest-id"] for row in rows[1:]]
 
-    rows = driver.find_elements_by_class_name("table-row")
+    # create a Name:ID dictionary sorted in alphabetical order
+    IDs_dict = dict(sorted(dict(zip(names, IDs)).items()))
 
-    IDs = [row.get_attribute("data-dest-id") for row in rows[1:]]
-    names = [row.find_element_by_tag_name(
-        "div").text.upper() for row in rows[1:]]
-
-    ID_dict = dict(zip(names, IDs))
-    ID_dict = dict(sorted(ID_dict.items()))
-
-    sorted_names = sorted(names)
-
-    headers, list_initials = [], []
-    for name in sorted_names:
-        initials = ''.join([x[0].upper() for x in name.split(' ')])
-        list_initials.append(initials)
-        headers.append(initials + "_H")
-        headers.append(initials + "_A")
-
-    first_names = [name.split()[0].capitalize() for name in sorted_names]
-
-    # check which first names, if any, are duplicates
-    indexes_to_change = [i for i, name in enumerate(
-        first_names) if first_names.count(name) > 1]
-
-    # add second initial to any that are duplicates
-    for i in indexes_to_change:
-        first_names[i] += " {}".format(sorted_names[i].split()[1][0].upper())
-
+    # save this dictionary to a new file
     with open("IDs.json", "w") as f:
-        f.write(json.dumps(ID_dict))
+        f.write(json.dumps(IDs_dict))
+
+    names.sort()
+    initials = [''.join([x[0].upper() for x in fullname.split(' ')])
+                for fullname in names]
+
+    # if any initials are duplicates, append a 1, 2, 3 etc until they are all unique
+    if len(set(initials)) != len(initials):
+        to_update = [i for i, initial in enumerate(
+            initials) if initials.count(initial) > 1]
+        for j, k in enumerate(to_update, 1):
+            initials[k] += " {}".format(str(j))
+
+    # headers for the 'Predictions' data
+    predictions_headers = []
+    for initial in initials:
+        predictions_headers.append(initial + " H")
+        predictions_headers.append(initial + " A")
+
+    results_headers = ["Home", "Away"]
 
     with open("predictions.csv", "w", newline="") as f:
         wr = csv.writer(f, delimiter=",")
-        wr.writerow(headers)
+        wr.writerow(predictions_headers)
 
     with open("results.csv", "w", newline="") as f:
         wr = csv.writer(f, delimiter=",")
-        wr.writerow(["Home", "Away"])
+        wr.writerow(results_headers)
 
     num_players = len(rows) - 1
 
@@ -70,62 +72,74 @@ def main():
     ss.add_worksheet(title="Points", rows=100, cols=num_players)
     wks = ss.worksheet_by_title("Points")
     formula = "= ARRAYFORMULA(IF(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 2) = \"-\", \"-\", IF(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 2) = \"\", \"\", IF(IF(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 2) = Results!A2:A, 1, 0) * IF(OFFSET(Predictions!B2:B, 0, 2 * COLUMN() - 2) = Results!B2:B, 1, 0) = 1, 5, IF(IF(IF(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 2) > OFFSET(Predictions!B2:B, 0, 2 * COLUMN() - 2), 1, 0) * IF(Results!A2:A > Results!B2:B, 1, 0) = 1, 1, 0) + IF(IF(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 2) < OFFSET(Predictions!B2:B, 0, 2 * COLUMN() - 2), 1, 0) * IF(Results!A2:A < Results!B2:B, 1, 0) = 1, 1, 0) + IF(IF(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 2) = OFFSET(Predictions!B2:B, 0, 2 * COLUMN() - 2), 1, 0) * IF(Results!A2:A = Results!B2:B, 1, 0) = 1, 1, 0) > 0, 2, 0)))))"
-    wks.update_row(1, list_initials)
+    wks.update_row(1, initials)
     wks.update_row(2, [formula] * num_players)
 
     ss.add_worksheet(title="PointsByRound", rows=100, cols=num_players)
     wks = ss.worksheet_by_title("PointsByRound")
     formula = "= IF(OFFSET(Points!A2, ROW() * 6 - 12, COLUMN() - 1) = \"\", \"\", IF(OFFSET(Points!A2, ROW() * 6 - 12, COLUMN() - 1) = \"-\", \"-\", SUM(OFFSET(Points!A2, ROW() * 6 - 12, COLUMN() - 1, 6, 1))))"
-    wks.update_row(1, list_initials)
-
+    wks.update_row(1, initials)
     df = pd.DataFrame([[formula] * num_players] * 99)
     wks.set_dataframe(df, "A2", copy_head=False)
 
     ss.add_worksheet(title="TableCalculation", rows=12, cols=num_players + 1)
     wks = ss.worksheet_by_title("TableCalculation")
-
-    wks.update_row(1, first_names, 1)
+    wks.update_row(1, names, 1)
     wks.update_col(1, ["Rounds", "Played", "Results", "Scores", "Points",
                                  "Pts / Round", "Std. Dev.", "Off By 1", "Off By 2", "Off By 3", "Off By 4+"], 1)
 
+    # initialise dataframe that will hold all the formulas to go into this worksheet
+    df = pd.DataFrame()
+
     formula_rounds = "= (COUNTIF(Predictions!A2:A, \"-\") + COUNTIF(Predictions!A2:A, \">=0\")) / 6"
-    wks.update_row(2, [formula_rounds] * num_players, 1)
+    df = df.append([formula_rounds])
+    # wks.update_row(2, [formula_rounds] * num_players, 1)
 
     formula_played = "= COUNTIF(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 4), \">=0\") / 6"
-    wks.update_row(3, [formula_played] * num_players, 1)
+    df = df.append([formula_played])
+    # wks.update_row(3, [formula_played] * num_players, 1)
 
     formula_results = "= COUNTIF(OFFSET(Points!A2:A, 0, COLUMN() - 2), 2)"
-    wks.update_row(4, [formula_results] * num_players, 1)
+    df = df.append([formula_results])
+    # wks.update_row(4, [formula_results] * num_players, 1)
 
     formula_scores = "= COUNTIF(OFFSET(Points!A2:A, 0, COLUMN() - 2), 5)"
-    wks.update_row(5, [formula_scores] * num_players, 1)
+    df = df.append([formula_scores])
+    # wks.update_row(5, [formula_scores] * num_players, 1)
 
     formula_points = "= 2 * OFFSET(B4, 0, COLUMN() - 2) + 5 * OFFSET(B5, 0, COLUMN() - 2)"
-    wks.update_row(6, [formula_points] * num_players, 1)
+    df = df.append([formula_points])
+    # wks.update_row(6, [formula_points] * num_players, 1)
 
     formula_points_per_round = "= IFERROR(OFFSET(B6, 0, COLUMN() - 2) / OFFSET(B3, 0, COLUMN() - 2), 0)"
-    wks.update_row(7, [formula_points_per_round] * num_players, 1)
+    df = df.append([formula_points_per_round])
+    # wks.update_row(7, [formula_points_per_round] * num_players, 1)
 
     formula_SD = "= IFERROR(STDEV(OFFSET(PointsByRound!A2, 0, COLUMN() - 2, 100, 1)), 0)"
-    wks.update_row(8, [formula_SD] * num_players, 1)
+    df = df.append([formula_SD])
+    # wks.update_row(8, [formula_SD] * num_players, 1)
 
     formula_off_by_one = "= SUM(ARRAYFORMULA(N(IFERROR(ABS(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 4) - Results!A2:A) + ABS(OFFSET(Predictions!B2:B, 0, 2 * COLUMN() - 4) - Results!B2:B) = 1, FALSE))))"
-    wks.update_row(9, [formula_off_by_one] * num_players, 1)
+    df = df.append([formula_off_by_one])
+    # wks.update_row(9, [formula_off_by_one] * num_players, 1)
 
     formula_off_by_two = "= SUM(ARRAYFORMULA(N(IFERROR(ABS(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 4) - Results!A2:A) + ABS(OFFSET(Predictions!B2:B, 0, 2 * COLUMN() - 4) - Results!B2:B) = 2, FALSE))))"
-    wks.update_row(10, [formula_off_by_two] * num_players, 1)
+    df = df.append([formula_off_by_two])
+    # wks.update_row(10, [formula_off_by_two] * num_players, 1)
 
     formula_off_by_three = "= SUM(ARRAYFORMULA(N(IFERROR(ABS(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 4) - Results!A2:A) + ABS(OFFSET(Predictions!B2:B, 0, 2 * COLUMN() - 4) - Results!B2:B) = 3, FALSE))))"
-    wks.update_row(11, [formula_off_by_three] * num_players, 1)
+    df = df.append([formula_off_by_three])
+    # wks.update_row(11, [formula_off_by_three] * num_players, 1)
 
     formula_off_by_four_plus = "= SUM(ARRAYFORMULA(N(IFERROR(ABS(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 4) - Results!A2:A) + ABS(OFFSET(Predictions!B2:B, 0, 2 * COLUMN() - 4) - Results!B2:B) >= 4, FALSE))))"
-    wks.update_row(12, [formula_off_by_four_plus] * num_players, 1)
+    df = df.append([formula_off_by_four_plus])
+    # wks.update_row(12, [formula_off_by_four_plus] * num_players, 1)
 
-    # model_cell = pygsheets.Cell("B7")
-    # model_cell.format = (pygsheets.FormatType.NUMBER, "00.00")
+    # give this dataframe the same number of columns as there are number of players
+    for i in range(1, num_players):
+        df[i] = df[0]
 
-    # format_range = wks.range("B7:8")
-    # format_range.apply_format(model_cell)
+    wks.set_dataframe(df, "B2", copy_head=False)
 
     ss.add_worksheet(title="Table", rows=num_players + 1, cols=12)
     wks = ss.worksheet_by_title("Table")
