@@ -1,8 +1,8 @@
-# Super6
-Super 6 is a football prediction game run by Sky Sports for players based in the UK and the Republic of Ireland. Every week, 6 matches are chosen and the aim is to predict the correct score for all 6 of these games. You can also join a league with friends, and gain points by either predicting the correct score (5 points), or predicting the correct result but not the correct score (2 points). The files in this repository give a google sheet with an extended league table compared to that on the Super 6 website, with extra columns such as rounds played, mean points per round, standard deviation, and how many times you were off by one goal.
+# Super 6
+Super 6 is a football prediction game run by Sky Sports for players based in the UK and the Republic of Ireland. Every week, 6 matches are chosen and the aim is to predict the correct score for all 6 of these games. You can also join a league with friends, and gain points by either predicting the correct score (5 points), or predicting the correct result but not the correct score (2 points). The files in this repository give a Google sheet with an extended league table compared to that on the Super 6 website, with extra columns such as rounds played, mean points per round, standard deviation, and how many times you were off by one, two, or three goals.
 
 # Example
-An example of what an up-to-date version of this looks like with formatting can be found here: https://docs.google.com/spreadsheets/d/1eRPzH7XA67ABOfYwXKEaxw50M9_yFgPY38wNG8Ss8Nw/edit#gid=1024874317
+An example of what a finished version of this looks like with formatting can be found here (with names removed): https://docs.google.com/spreadsheets/d/1eRPzH7XA67ABOfYwXKEaxw50M9_yFgPY38wNG8Ss8Nw/edit#gid=1024874317
 
 # Requirements:
 A valid Google account
@@ -26,5 +26,5 @@ pandas
 8. Share this spreadsheet with the client email located in you creds.json file.
 9. Open setup.py and change the league_id and spreadsheet_name to your desired values, and username and pin to your login details.
   Note: The spreadsheet name must match with that you chose to call it in step 7, and the league ID can be found when looking at the current standings on the super6 website.
-10. Run setup.py. This should change your new spreadsheet to a blank version of the final spreadsheet and also create one new json file that stores the IDs of all players in your league, and two new csv files 'predictions' and 'results' that are later used to populate the spreadsheet.
+10. Run setup.py. This should change your new spreadsheet to a blank version of the final spreadsheet and also create one new json file that stores the IDs of all players in your league, and two new csv files 'predictions' and 'results' that are later used to populate the spreadsheet. If you want to add more columns to the final league table, you can do so by adding another row to "TableCalculation" and changing the 12 in the SORT() formula on "Table" to a 13.
 11. Run main.py. This will find how many rounds you have played and how many round have been played in the game, and get the results and predictions until you are up to date.
