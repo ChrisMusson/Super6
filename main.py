@@ -10,10 +10,6 @@ import pygsheets
 
 
 def main():
-
-    with open("IDs.json", "r") as f:
-        IDs = json.load(f)
-
     with open("predictions.csv", "r") as f:
         rounds_preds = (sum(1 for line in f) - 1) / 6
     if rounds_preds != int(rounds_preds):
@@ -31,6 +27,9 @@ def main():
         return -1
 
     rounds = int(rounds_preds)
+
+    with open("IDs.json", "r") as f:
+        IDs = json.load(f)
 
     with requests.Session() as s:
         login(s, username, pin)

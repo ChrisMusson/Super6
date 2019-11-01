@@ -2,7 +2,7 @@
 Super 6 is a football prediction game run by Sky Sports for players based in the UK and the Republic of Ireland. Every week, 6 matches are chosen and the aim is to predict the correct score for all 6 of these games. You can also join a league with friends, and gain points by either predicting the correct score (5 points), or predicting the correct result but not the correct score (2 points). The files in this repository give a Google sheet with an extended league table compared to that on the Super 6 website, with extra columns such as rounds played, mean points per round, standard deviation, and how many times you were off by one, two, or three goals.
 
 # Example
-An example of what a finished version of this looks like with formatting can be found here (with names removed): https://docs.google.com/spreadsheets/d/1eRPzH7XA67ABOfYwXKEaxw50M9_yFgPY38wNG8Ss8Nw/edit#gid=1024874317
+An example of what a finished version of this looks like can be found here (with names removed): https://docs.google.com/spreadsheets/d/1eRPzH7XA67ABOfYwXKEaxw50M9_yFgPY38wNG8Ss8Nw/edit#gid=1024874317
 
 # Requirements:
 A valid Google account
