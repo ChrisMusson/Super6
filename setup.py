@@ -64,10 +64,7 @@ def main():
     ss = session.open(spreadsheet_name)
 
     ss.add_worksheet(title="Predictions", rows=600, cols=num_players * 2)
-    wks = ss.worksheet_by_title("Predictions")
-
     ss.add_worksheet(title="Results", rows=600, cols=2)
-    wks = ss.worksheet_by_title("Results")
 
     ss.add_worksheet(title="Points", rows=100, cols=num_players)
     wks = ss.worksheet_by_title("Points")
