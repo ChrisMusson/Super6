@@ -23,9 +23,9 @@ def conditional_format(sheetId, formula, startColumnIndex, endColumnIndex, start
                     },
                     "format": {
                         "backgroundColor": {
-                            "red": 0.8,
-                            "green": 0.9,
-                            "blue": 0.9
+                            "red": 0.79,
+                            "green": 0.86,
+                            "blue": 0.97
                         }
 
 
