@@ -70,12 +70,14 @@ def main():
     formatting_formula = "=mod(floor((row() - 1) / 6 - (1 / 12)), 2) = 0"
     ss.client.sheet.batch_update(ss.id, conditional_format(
         wks.id, formatting_formula, 0, wks.cols, 0, wks.rows))
+    wks.adjust_column_width(0, wks.cols, 50)
 
     ss.add_worksheet(title="Results", rows=600, cols=2)
     wks = ss.worksheet_by_title("Results")
     formatting_formula = "=mod(floor((row() - 1) / 6 - (1 / 12)), 2) = 0"
     ss.client.sheet.batch_update(ss.id, conditional_format(
         wks.id, formatting_formula, 0, wks.cols, 0, wks.rows))
+    wks.adjust_column_width(0, wks.cols, 50)
 
     ss.add_worksheet(title="Points", rows=600, cols=num_players)
     wks = ss.worksheet_by_title("Points")
@@ -85,6 +87,7 @@ def main():
     formatting_formula = "=mod(floor((row() - 1) / 6 - (1 / 12)), 2) = 0"
     ss.client.sheet.batch_update(ss.id, conditional_format(
         wks.id, formatting_formula, 0, wks.cols, 0, wks.rows))
+    wks.adjust_column_width(0, wks.cols)
 
     ss.add_worksheet(title="PointsByRound", rows=100, cols=num_players)
     wks = ss.worksheet_by_title("PointsByRound")
@@ -95,12 +98,14 @@ def main():
     formatting_formula = "=mod(row() + 1, 2)"
     ss.client.sheet.batch_update(ss.id, conditional_format(
         wks.id, formatting_formula, 0, wks.cols, 0, wks.rows))
+    wks.adjust_column_width(0, wks.cols)
 
     ss.add_worksheet(title="TableCalculation", rows=12, cols=num_players + 1)
     wks = ss.worksheet_by_title("TableCalculation")
     wks.update_row(1, names, 1)
     wks.update_col(1, ["Rounds", "Played", "Results", "Scores", "Points",
                                  "Pts / Round", "Std. Dev.", "Off By 1", "Off By 2", "Off By 3", "Off By 4+"], 1)
+    wks.adjust_column_width(0, wks.cols)
 
     # initialise the dataframe that will hold all the formulas to go into the TableCalculation worksheet
     df = pd.DataFrame()
@@ -144,9 +149,11 @@ def main():
 
     wks.set_dataframe(df, "B2", copy_head=False)
 
-    # change the number format of the points/round and standard rows to #0.00
+    # change the number format of the points per round and standard deviation rows to #0.00
     ss.client.sheet.batch_update(ss.id, number_format(
         wks.id, "#0.00", 1, wks.cols, 6, 8))
+
+    wks.adjust_column_width(0, wks.cols)
 
     ss.add_worksheet(title="Table", rows=num_players + 1, cols=12)
     wks = ss.worksheet_by_title("Table")
