@@ -144,7 +144,7 @@ def main():
 
     wks.set_dataframe(df, "B2", copy_head=False)
 
-    # change the number format of the points/round and standard rows to #0.00
+    # change the number format of the points per round and standard deviation rows to #0.00
     ss.client.sheet.batch_update(ss.id, number_format(
         wks.id, "#0.00", 1, wks.cols, 6, 8))
 
