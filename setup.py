@@ -90,47 +90,36 @@ def main():
 
     formula_rounds = "= (COUNTIF(Predictions!A2:A, \"-\") + COUNTIF(Predictions!A2:A, \">=0\")) / 6"
     df = df.append([formula_rounds])
-    # wks.update_row(2, [formula_rounds] * num_players, 1)
 
     formula_played = "= COUNTIF(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 4), \">=0\") / 6"
     df = df.append([formula_played])
-    # wks.update_row(3, [formula_played] * num_players, 1)
 
     formula_results = "= COUNTIF(OFFSET(Points!A2:A, 0, COLUMN() - 2), 2)"
     df = df.append([formula_results])
-    # wks.update_row(4, [formula_results] * num_players, 1)
 
     formula_scores = "= COUNTIF(OFFSET(Points!A2:A, 0, COLUMN() - 2), 5)"
     df = df.append([formula_scores])
-    # wks.update_row(5, [formula_scores] * num_players, 1)
 
     formula_points = "= 2 * OFFSET(B4, 0, COLUMN() - 2) + 5 * OFFSET(B5, 0, COLUMN() - 2)"
     df = df.append([formula_points])
-    # wks.update_row(6, [formula_points] * num_players, 1)
 
     formula_points_per_round = "= IFERROR(OFFSET(B6, 0, COLUMN() - 2) / OFFSET(B3, 0, COLUMN() - 2), 0)"
     df = df.append([formula_points_per_round])
-    # wks.update_row(7, [formula_points_per_round] * num_players, 1)
 
     formula_SD = "= IFERROR(STDEV(OFFSET(PointsByRound!A2, 0, COLUMN() - 2, 100, 1)), 0)"
     df = df.append([formula_SD])
-    # wks.update_row(8, [formula_SD] * num_players, 1)
 
     formula_off_by_one = "= SUM(ARRAYFORMULA(N(IFERROR(ABS(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 4) - Results!A2:A) + ABS(OFFSET(Predictions!B2:B, 0, 2 * COLUMN() - 4) - Results!B2:B) = 1, FALSE))))"
     df = df.append([formula_off_by_one])
-    # wks.update_row(9, [formula_off_by_one] * num_players, 1)
 
     formula_off_by_two = "= SUM(ARRAYFORMULA(N(IFERROR(ABS(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 4) - Results!A2:A) + ABS(OFFSET(Predictions!B2:B, 0, 2 * COLUMN() - 4) - Results!B2:B) = 2, FALSE))))"
     df = df.append([formula_off_by_two])
-    # wks.update_row(10, [formula_off_by_two] * num_players, 1)
 
     formula_off_by_three = "= SUM(ARRAYFORMULA(N(IFERROR(ABS(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 4) - Results!A2:A) + ABS(OFFSET(Predictions!B2:B, 0, 2 * COLUMN() - 4) - Results!B2:B) = 3, FALSE))))"
     df = df.append([formula_off_by_three])
-    # wks.update_row(11, [formula_off_by_three] * num_players, 1)
 
     formula_off_by_four_plus = "= SUM(ARRAYFORMULA(N(IFERROR(ABS(OFFSET(Predictions!A2:A, 0, 2 * COLUMN() - 4) - Results!A2:A) + ABS(OFFSET(Predictions!B2:B, 0, 2 * COLUMN() - 4) - Results!B2:B) >= 4, FALSE))))"
     df = df.append([formula_off_by_four_plus])
-    # wks.update_row(12, [formula_off_by_four_plus] * num_players, 1)
 
     # give this dataframe the same number of columns as there are number of players
     for i in range(1, num_players):
