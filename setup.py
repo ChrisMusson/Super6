@@ -152,7 +152,6 @@ def main():
     # change the number format of the points per round and standard deviation rows to #0.00
     ss.client.sheet.batch_update(ss.id, number_format(
         wks.id, "#0.00", 1, wks.cols, 6, 8))
-
     wks.adjust_column_width(0, wks.cols)
 
     ss.add_worksheet(title="Table", rows=num_players + 1, cols=12)
