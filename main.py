@@ -35,8 +35,13 @@ def main():
         login(s, username, pin)
         page = s.get("https://super6.skysports.com/play")
         soup = BeautifulSoup(page.content, "lxml")
-        next_round = int(soup.find(
-            "form", class_="predictions-body--old")["data-round"])
+        try:
+            next_round = int(
+                soup.find("form", class_="predictions-body--old")["data-round"])
+        except TypeError:
+            print(
+                "There is a round in progress. Wait until the next round's fixtures are released")
+            return 0
 
         difference = next_round - rounds
 
