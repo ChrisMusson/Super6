@@ -1,15 +1,15 @@
-from setup import username, pin, league_id, spreadsheet_name
-import requests
-from login import login
+import aiohttp
+import asyncio
 import json
-from get_predictions import get_predictions
-from get_results import get_results
 import pandas as pd
-from bs4 import BeautifulSoup
 import pygsheets
+from bs4 import BeautifulSoup
+from utils import fetch, login, get_predictions, get_results
+from setup import username, pin, league_id, spreadsheet_name
 
 
-def main():
+async def main():
+
     with open("predictions.csv", "r") as f:
         rounds_preds = (sum(1 for line in f) - 1) / 6
     if rounds_preds != int(rounds_preds):
@@ -26,15 +26,18 @@ def main():
         print("There are a different number of rows in your predictions.csv and results.csv files")
         return -1
 
-    rounds = int(rounds_preds)
+    rounds_completed = int(rounds_preds)
 
     with open("IDs.json", "r") as f:
         IDs = json.load(f)
+    num_players = len(IDs)
 
-    with requests.Session() as s:
-        login(s, username, pin)
-        page = s.get("https://super6.skysports.com/play")
-        soup = BeautifulSoup(page.content, "lxml")
+    async with aiohttp.ClientSession() as session:
+
+        await login(session, username, pin)
+        page = await fetch(session, "https://super6.skysports.com/play")
+        soup = BeautifulSoup(page, "lxml")
+
         try:
             next_round = int(
                 soup.find("form", class_="predictions-body--old")["data-round"])
@@ -43,41 +46,53 @@ def main():
                 "There is a round in progress. Wait until the next round's fixtures are released")
             return 0
 
-        difference = next_round - rounds
-
-        if difference == 1:
+        if next_round - rounds_completed == 1:
             print("Your data is already up to date")
             return 0
-
         else:
-            for i in range(rounds + 1, next_round):
-                print("getting data for round {}".format(i))
+            rounds_needed = list(
+                range(rounds_completed + 1, next_round))
+            if len(rounds_needed) == 1:
+                print(f"Getting data for round {rounds_needed[0]}")
+            else:
+                print(
+                    f"Getting data for rounds {rounds_needed[0]} - {rounds_needed[-1]}")
 
-                all_predictions_for_round = []
-                for ID in IDs.values():
-                    all_predictions_for_round.append(get_predictions(s, i, ID))
+        tasks_preds = [asyncio.ensure_future(get_predictions(
+            session, round, ID)) for round in rounds_needed for ID in IDs.values()]
+        tasks_results = [asyncio.ensure_future(
+            get_results(session, round)) for round in rounds_needed]
 
-                predictions = pd.DataFrame()
-                for lst in all_predictions_for_round:
-                    # reshape each chunk of 12 predictions to 6 rows of 2 columns (6 matches of Home and Away predictions)
-                    reshaped = pd.DataFrame(
-                        data=pd.Series(lst).values.reshape(6, 2))
-                    # put these together horizontally to form 6 rows of P1 Home, P1 Away, P2 Home, P2 Away etc
-                    predictions = pd.concat(
-                        [predictions, reshaped], axis=1, ignore_index=True)
+        # returns responses in same order as input
+        responses_preds = await asyncio.gather(*tasks_preds)
+        responses_results = await asyncio.gather(*tasks_results)
 
-                with open("predictions.csv", "a", newline="") as f:
-                    predictions.to_csv(f, header=False, index=False)
+    # restructure predictions into a dataframe with suitable layout
+    preds_df = pd.DataFrame()
+    for i in range(len(rounds_needed)):
+        round_df = pd.DataFrame()
+        for preds_lst in responses_preds[num_players * i:num_players * (i + 1)]:
+            reshaped = pd.DataFrame(
+                data=pd.Series(preds_lst).values.reshape(6, 2))
+            round_df = pd.concat([round_df, reshaped],
+                                 axis=1, ignore_index=True)
+        preds_df = pd.concat([preds_df, round_df],
+                             axis=0, ignore_index=True)
 
-                results = get_results(s, i)
-                reshaped = pd.DataFrame(
-                    data=pd.Series(results).values.reshape(6, 2))
+    with open("predictions.csv", "a", newline="") as f:
+        preds_df.to_csv(f, header=False, index=False)
 
-                with open("results.csv", "a", newline="") as f:
-                    reshaped.to_csv(f, header=False, index=False)
+    results_df = pd.DataFrame()
+    for results_lst in responses_results:
+        reshaped = pd.DataFrame(data=pd.Series(
+            results_lst).values.reshape(6, 2))
+        results_df = pd.concat(
+            [results_df, reshaped], axis=0, ignore_index=True)
 
-    print("Writing the predictions and scores to the spreadsheet {}".format(
-        spreadsheet_name))
+    with open("results.csv", "a", newline="") as f:
+        results_df.to_csv(f, header=False, index=False)
+
+    print(f"Writing data to spreadsheet {spreadsheet_name}")
 
     session = pygsheets.authorize(service_file='creds.json')
     spreadsheet = session.open(spreadsheet_name)
@@ -92,4 +107,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

@@ -1,26 +1,27 @@
-from login import login
-import requests
-from bs4 import BeautifulSoup
+import aiohttp
+import asyncio
 import json
 import csv
 import pygsheets
 import pandas as pd
+from bs4 import BeautifulSoup
+from utils import fetch, login
 from format_worksheet import conditional_format, number_format, bold_format
 
-username = ""
-pin = ""
-league_id = ""
-spreadsheet_name = ""
+username = "CHRISMUSSON1"
+pin = "31337"
+league_id = "1VC9BP"
+spreadsheet_name = "just_testing_stuff_3"
 
 
-def main():
-    with requests.Session() as s:
-        login(s, username, pin)
-        league_page = s.get(
-            "https://super6.skysports.com/league/{}/season".format(league_id))
+async def main():
+    async with aiohttp.ClientSession() as session:
+        await login(session, username, pin)
+        league_page = await fetch(session,
+                                  f"https://super6.skysports.com/league/{league_id}/season")
 
-    soup = BeautifulSoup(league_page.content, "lxml")
-    rows = soup.find_all("table")[1].find_all("tr")
+        soup = BeautifulSoup(league_page, "lxml")
+        rows = soup.find_all("table")[1].find_all("tr")
 
     names = [str(row.div)[5:-6].title() for row in rows[1:]]
     IDs = [row["data-dest-id"] for row in rows[1:]]
@@ -178,4 +179,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
