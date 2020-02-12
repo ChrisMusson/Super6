@@ -66,6 +66,7 @@ def main():
 
     ss.add_worksheet(title="Predictions", rows=600, cols=num_players * 2)
     wks = ss.worksheet_by_title("Predictions")
+    wks.update_row(1, predictions_headers)
     # conditional formatting formula to batch update to the entire sheet from format_worksheet.py
     formatting_formula = "=mod(floor((row() - 1) / 6 - (1 / 12)), 2) = 0"
     ss.client.sheet.batch_update(ss.id, conditional_format(
@@ -74,6 +75,7 @@ def main():
 
     ss.add_worksheet(title="Results", rows=600, cols=2)
     wks = ss.worksheet_by_title("Results")
+    wks.update_row(1, results_headers)
     formatting_formula = "=mod(floor((row() - 1) / 6 - (1 / 12)), 2) = 0"
     ss.client.sheet.batch_update(ss.id, conditional_format(
         wks.id, formatting_formula, 0, wks.cols, 0, wks.rows))
