@@ -16,4 +16,4 @@ An example of what a finished version of this looks like (with names omitted) ca
 9. Open setup.py and change the league_id and spreadsheet_name to your desired values, and username and pin to your login details.
   Note: The spreadsheet name must be the same as what you chose to call it in step 7, and the league ID can be found when looking at the current standings on the super6 website.
 10. Run setup.py. This should change your new spreadsheet to a blank version of the final spreadsheet and also create one new json file that stores the IDs of all players in your league, and two new csv files 'predictions' and 'results' that are later used to populate the spreadsheet.
-11. Run main.py. This will find how many rounds you have played and how many round have been played in the game, get the results and predictions until you are up to date, and then update your Google sheet accordingly.
+11. Run main.py. This will find how many rounds you have played and how many rounds have been played in the game, get the results and predictions until you are up to date, and then update your Google sheet accordingly.
