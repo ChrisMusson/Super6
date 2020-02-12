@@ -8,10 +8,10 @@ from bs4 import BeautifulSoup
 from utils import fetch, login
 from format_worksheet import conditional_format, number_format, bold_format
 
-username = "CHRISMUSSON1"
-pin = "31337"
-league_id = "1VC9BP"
-spreadsheet_name = "just_testing_stuff_3"
+username = ""
+pin = ""
+league_id = ""
+spreadsheet_name = ""
 
 
 async def main():
