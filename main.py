@@ -4,7 +4,7 @@ import json
 import pandas as pd
 import pygsheets
 from bs4 import BeautifulSoup
-from utils import fetch, login, get_predictions, get_results
+from utils import fetch, login, get_predictions, get_results, print_rounds_needed
 from setup import username, pin, league_id, spreadsheet_name
 
 
@@ -33,35 +33,66 @@ async def main():
     num_players = len(IDs)
 
     async with aiohttp.ClientSession() as session:
-
         await login(session, username, pin)
         page = await fetch(session, "https://super6.skysports.com/play")
         soup = BeautifulSoup(page, "lxml")
 
         try:
+            # this element is only available when a round is not in progress
             next_round = int(
                 soup.find("form", class_="predictions-body--old")["data-round"])
+            in_progress = False
+
         except TypeError:
-            print(
-                "There is a round in progress. Wait until the next round's fixtures are released")
-            return 0
+            # the next round's fixtures are not available yet
+            # this is important because the relevant URLs are different when a round is in progress
+            in_progress = True
 
-        if next_round - rounds_completed == 1:
-            print("Your data is already up to date")
-            return 0
-        else:
-            rounds_needed = list(
-                range(rounds_completed + 1, next_round))
-            if len(rounds_needed) == 1:
-                print(f"Getting data for round {rounds_needed[0]}")
+            current_round = int(
+                soup.find("h2", class_="panel-header").text.strip()[6:])
+            matches = soup.find_all("div", class_="prediction-card--old")
+            for match in matches:
+                try:
+                    # if there is a match in progress, stop the program
+                    if match.find("span", class_="live-flag").text == "LIVE":
+                        print(
+                            "There is a round in progress. Wait until all matches have been completed")
+                        return -1
+                except AttributeError:
+                    # the match has no live-flag so the game has finished, and shouldn't cause us to stop the program
+                    continue
+
+        '''
+        if the program gets to this point, it means that either the round is not in progress,
+        or that the round is in progress but all matches have finished
+        '''
+
+        if not in_progress:
+            if next_round - rounds_completed == 1:
+                print("Your data is already up to date")
+                return -1
             else:
-                print(
-                    f"Getting data for rounds {rounds_needed[0]} - {rounds_needed[-1]}")
+                rounds_needed = list(range(rounds_completed + 1, next_round))
+                print_rounds_needed(rounds_needed)
+                # don't have to worry about the in-play argument or URLs being different for different rounds when fetching data
+                tasks_preds = [asyncio.ensure_future(get_predictions(
+                    session, round, ID)) for round in rounds_needed for ID in IDs.values()]
+                tasks_results = [asyncio.ensure_future(
+                    get_results(session, round)) for round in rounds_needed]
 
-        tasks_preds = [asyncio.ensure_future(get_predictions(
-            session, round, ID)) for round in rounds_needed for ID in IDs.values()]
-        tasks_results = [asyncio.ensure_future(
-            get_results(session, round)) for round in rounds_needed]
+        else:  # in_progress=True
+            if current_round - rounds_completed == 0:
+                print("Your data is already up to date")
+                return -1
+            else:
+                rounds_needed = list(
+                    range(rounds_completed + 1, current_round + 1))
+                print_rounds_needed(rounds_needed)
+                # gather all rounds up until this current round with in_progress=False (it is by default), then also this current round with it being true
+                tasks_preds = [asyncio.ensure_future(get_predictions(session, round, ID)) for round in rounds_needed[:-1] for ID in IDs.values()] + [
+                    asyncio.ensure_future(get_predictions(session, current_round, ID, in_progress)) for ID in IDs.values()]
+                tasks_results = [asyncio.ensure_future(get_results(session, round)) for round in rounds_needed[:-1]] + [
+                    asyncio.ensure_future(get_results(session, current_round, in_progress))]
 
         # returns responses in same order as input
         responses_preds = await asyncio.gather(*tasks_preds)
