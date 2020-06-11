@@ -1,9 +1,2 @@
-__pycache__/
-Include/
-Lib/
-Scripts/
-creds.json
-IDs.json
-predictions.csv
-results.csv
-pyenv.cfg
+.venv/
+.vscode/
