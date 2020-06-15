@@ -10,6 +10,7 @@ async def fetch(session, url):
         assert resp.status == 200
         return await resp.json()
 
+
 def initialise_database(cursor):
 
     cursor.execute('''
@@ -46,6 +47,23 @@ def initialise_database(cursor):
         )
     ''')
 
+    cursor.execute('''
+        CREATE TABLE Calculations (
+            user_id int,
+            user_name text,
+            rounds_played int,
+            correct_results int,
+            correct_scores int,
+            points int,
+            pts_per_round real,
+            off_by_1 int,
+            off_by_2 int,
+            off_by_3 int,
+            off_by_4_or_more int
+        )
+    ''')
+
+
 async def update_users(session, cursor):
     with open("IDs.csv", "r") as f:
         reader = csv.reader(f)
@@ -68,6 +86,7 @@ async def update_users(session, cursor):
         cursor.execute('''INSERT INTO Users VALUES(?, ?, ?)''',
                        (user_id, first_name.capitalize(), last_name.capitalize()))
 
+
 async def update_single_round_info_and_results(session, cursor, round_number, active_round):
     data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}")
     for match in data["scoreChallenges"]:
@@ -82,6 +101,7 @@ async def update_single_round_info_and_results(session, cursor, round_number, ac
                 INSERT INTO Results
                 VALUES (?, ?, ?, ?)
             ''', (match["match"]["id"], round_number, match["match"]["homeTeam"]["score"], match["match"]["awayTeam"]["score"]))
+
 
 async def update_multiple_rounds_info_and_results(session, cursor, active_round):
     last_updated_round = cursor.execute('''
@@ -99,6 +119,7 @@ async def update_multiple_rounds_info_and_results(session, cursor, active_round)
                 session, cursor, round_number, active_round))
 
         return await asyncio.gather(*tasks)
+
 
 async def update_single_user_single_round_predictions(session, cursor, user_id, round_number):
     data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}/user/{user_id}")
@@ -119,6 +140,7 @@ async def update_single_user_single_round_predictions(session, cursor, user_id, 
             cursor.execute('''INSERT INTO Predictions VALUES(?, ?, ?, ?, ?)''',
                            (user_id, match_id, round_number, None, None))
 
+
 async def update_single_user_multiple_rounds_predictions(session, cursor, user_id, active_round):
     last_updated_round = cursor.execute('''
         SELECT MAX(round_number)
@@ -137,6 +159,7 @@ async def update_single_user_multiple_rounds_predictions(session, cursor, user_i
 
         return await asyncio.gather(*tasks)
 
+
 async def update_multiple_users_multiple_rounds_predictions(session, cursor, active_round):
     tasks = []
     for user_id in [x[0] for x in
@@ -149,6 +172,92 @@ async def update_multiple_users_multiple_rounds_predictions(session, cursor, act
             session, cursor, user_id, active_round))
     return await asyncio.gather(*tasks)
 
+
+def off_by(cursor, user_id, x, exactly=True):
+    '''returns how many predictions were wrong by exactly x goals if exactly=True,
+    at least x goals otherwise'''
+
+    if exactly:
+        return cursor.execute('''
+            SELECT count(*)
+            FROM (SELECT * FROM Predictions WHERE user_id = ?) x
+            INNER JOIN Results
+            ON x.match_id = Results.match_id
+            WHERE abs(x.home - Results.home) + abs(x.away - Results.away) = ?
+        ''', (user_id, x)).fetchone()[0]
+
+    else:
+        return cursor.execute('''
+            SELECT count(*)
+            FROM (SELECT * FROM Predictions WHERE user_id = ?) x
+            INNER JOIN Results
+            ON x.match_id = Results.match_id
+            WHERE abs(x.home - Results.home) + abs(x.away - Results.away) >= ?
+        ''', (user_id, x)).fetchone()[0]
+
+
+async def update_single_user_calculations(cursor, user_id):
+
+    user_name = " ".join(cursor.execute('''
+        SELECT first_name, last_name
+        FROM Users
+        WHERE user_id = ?
+    ''', (user_id,)).fetchone())
+
+    rounds_played = cursor.execute('''
+        SELECT count(*)/6
+        FROM (SELECT * FROM Predictions WHERE user_id = ?) x
+        WHERE x.home IS NOT NULL
+    ''', (user_id,)).fetchone()[0]
+
+    correct_results = cursor.execute('''
+        SELECT count(*)
+        FROM (SELECT * FROM Predictions WHERE user_id = ?) x
+        INNER JOIN Results
+        ON x.match_id = Results.match_id
+        WHERE (x.home - x.away > 0 AND  Results.home - Results.away > 0
+            OR x.home - x.away = 0 AND  Results.home - Results.away = 0
+            OR x.home - x.away < 0 AND  Results.home - Results.away < 0
+            )
+            AND (x.home != Results.home OR x.away != Results.away)
+    ''', (user_id,)).fetchone()[0]
+
+    correct_scores = off_by(cursor, user_id, 0)
+
+    points = correct_scores*5 + correct_results*2
+
+    off_by_1 = off_by(cursor, user_id, 1)
+    off_by_2 = off_by(cursor, user_id, 2)
+    off_by_3 = off_by(cursor, user_id, 3)
+    off_by_4_or_more = off_by(cursor, user_id, 4, exactly=False)
+
+    pts_per_round = round(points / rounds_played, 2)
+
+    cursor.execute('''
+        INSERT INTO Calculations
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+    ''', (user_id, user_name, rounds_played, correct_results, correct_scores, points, pts_per_round, off_by_1, off_by_2, off_by_3, off_by_4_or_more))
+
+
+async def update_multiple_user_calculations(cursor):
+    # brutish way to make sure records don't get repeated
+    # would be better to check for any changes and if they exist update, else don't
+    cursor.execute('''
+        DELETE FROM Calculations
+    ''')
+
+    tasks = []
+    for user_id in [x[0] for x in
+                    cursor.execute('''
+            SELECT user_id
+            FROM Users
+        ''').fetchall()
+                    ]:
+        tasks.append(update_single_user_calculations(
+            cursor, user_id))
+    return await asyncio.gather(*tasks)
+
+
 async def main():
     # flag to check if database already exists
     exists = path.exists("database.db")
@@ -157,27 +266,31 @@ async def main():
     cursor = connection.cursor()
 
     if not exists:
-        # creates tables and specifies the columns and the datatypes of said columns
+        # create tables and specify the columns and their datatypes
         initialise_database(cursor)
 
     async with aiohttp.ClientSession() as session:
         active_round_info = await fetch(session, "https://super6.skysports.com/api/v2/round/active")
         active_round = active_round_info["id"]
 
-        # checks for new ID values in IDs.csv and if any are found, adds the ID and corresponding name to the Users table
+        # check for new ID values in IDs.csv and if any are found, add the ID and corresponding name to the Users table
         await update_users(session, cursor)
 
-        # updates the Rounds and Results tables
+        # update the Rounds and Results tables
         # in the case of the Rounds table, this is up to and including active_round
         # in the case of the Results table, this is up to but excluding active_round
         await update_multiple_rounds_info_and_results(session, cursor, active_round)
 
-        # updates the Predictions table
+        # update the Predictions table
         await update_multiple_users_multiple_rounds_predictions(session, cursor, active_round)
+
+        # update the calculations table
+        await update_multiple_user_calculations(cursor)
 
     # commit changes and close the connection
     connection.commit()
     connection.close()
+
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
