@@ -80,12 +80,31 @@ async def update_users(session, cursor):
     users_to_add = [
         user_id for user_id in IDs_from_file if user_id not in IDs_from_database]
 
+    users_to_delete = [
+        user_id for user_id in IDs_from_database if user_id not in IDs_from_file]
+
     for user_id in users_to_add:
         user_data = await fetch(session, f"https://super6.skysports.com/api/v2/score/leaderboard/user/{user_id}?period=season")
         first_name, last_name = user_data["firstName"], user_data["lastName"]
 
         cursor.execute('''INSERT INTO Users VALUES(?, ?, ?)''',
                        (user_id, first_name.capitalize(), last_name.capitalize()))
+
+    for user_id in users_to_delete:
+        cursor.execute('''
+            DELETE FROM Users 
+            WHERE user_id = ?
+        ''', (user_id,))
+
+        cursor.execute('''
+            DELETE FROM Predictions 
+            WHERE user_id = ?
+        ''', (user_id,))
+
+        cursor.execute('''
+            DELETE FROM Calculations 
+            WHERE user_id = ?
+        ''', (user_id,))
 
 
 async def update_single_round_info_and_results(session, cursor, round_number, active_round):
