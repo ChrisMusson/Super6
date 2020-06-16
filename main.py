@@ -1,5 +1,6 @@
 import sqlite3
 from os import path
+from prettytable import PrettyTable
 import csv
 import aiohttp
 import asyncio
@@ -257,6 +258,25 @@ async def update_multiple_user_calculations(cursor):
             cursor, user_id))
     return await asyncio.gather(*tasks)
 
+def print_final_table(cursor):
+    league_table = cursor.execute('''
+        SELECT *
+        FROM Calculations
+        ORDER BY points DESC, correct_scores DESC
+    ''').fetchall()
+
+    field_names = [x[0] for x in cursor.execute('''
+        SELECT *
+        FROM Calculations
+    ''').description]
+
+    pretty_table = PrettyTable()
+    pretty_table.field_names = field_names
+    for x in league_table:
+        pretty_table.add_row(list(x))
+
+    print(pretty_table)
+
 
 async def main():
     # flag to check if database already exists
@@ -284,8 +304,10 @@ async def main():
         # update the Predictions table
         await update_multiple_users_multiple_rounds_predictions(session, cursor, active_round)
 
-        # update the calculations table
-        await update_multiple_user_calculations(cursor)
+    # update the calculations table
+    await update_multiple_user_calculations(cursor)
+
+    print_final_table(cursor)
 
     # commit changes and close the connection
     connection.commit()
