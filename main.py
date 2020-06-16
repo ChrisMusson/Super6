@@ -111,19 +111,21 @@ async def update_users(session, cursor):
 
 
 async def update_single_round_info_and_results(session, cursor, round_number, active_round):
-    data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}")
-    for match in data["scoreChallenges"]:
-        cursor.execute('''
-            INSERT INTO Rounds
-            VALUES (?, ?)
-        ''',
-                       (round_number, match["match"]["id"])
-                       )
-        if round_number != active_round:
+    # Completely ignore round 50 as that was voided with no points awarded due to COVID 19
+    if round_number != 50:
+        data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}")
+        for match in data["scoreChallenges"]:
             cursor.execute('''
-                INSERT INTO Results
-                VALUES (?, ?, ?, ?)
-            ''', (match["match"]["id"], round_number, match["match"]["homeTeam"]["score"], match["match"]["awayTeam"]["score"]))
+                INSERT INTO Rounds
+                VALUES (?, ?)
+            ''',
+                        (round_number, match["match"]["id"])
+                        )
+            if round_number != active_round:
+                cursor.execute('''
+                    INSERT INTO Results
+                    VALUES (?, ?, ?, ?)
+                ''', (match["match"]["id"], round_number, match["match"]["homeTeam"]["score"], match["match"]["awayTeam"]["score"]))
 
 
 async def update_multiple_rounds_info_and_results(session, cursor, active_round):
@@ -145,23 +147,24 @@ async def update_multiple_rounds_info_and_results(session, cursor, active_round)
 
 
 async def update_single_user_single_round_predictions(session, cursor, user_id, round_number):
-    data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}/user/{user_id}")
+    # Completely ignore round 50 as that was voided with no points awarded due to COVID 19
+    if round_number != 50:
+        data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}/user/{user_id}")
+        if data["hasPredicted"]:
+            for pred in data["predictions"]["scores"]:
+                match_id, home, away = pred["matchId"], pred["scoreHome"], pred["scoreAway"]
+                cursor.execute('''INSERT INTO Predictions VALUES(?, ?, ?, ?, ?)''',
+                            (user_id, match_id, round_number, home, away))
 
-    if data["hasPredicted"]:
-        for pred in data["predictions"]["scores"]:
-            match_id, home, away = pred["matchId"], pred["scoreHome"], pred["scoreAway"]
-            cursor.execute('''INSERT INTO Predictions VALUES(?, ?, ?, ?, ?)''',
-                           (user_id, match_id, round_number, home, away))
-
-    else:
-        match_ids = [x[0] for x in cursor.execute('''
-        SELECT match_id
-        FROM Rounds
-        WHERE round_number == ?
-    ''', (round_number,)).fetchall()]
-        for match_id in match_ids:
-            cursor.execute('''INSERT INTO Predictions VALUES(?, ?, ?, ?, ?)''',
-                           (user_id, match_id, round_number, None, None))
+        else:
+            match_ids = [x[0] for x in cursor.execute('''
+            SELECT match_id
+            FROM Rounds
+            WHERE round_number == ?
+        ''', (round_number,)).fetchall()]
+            for match_id in match_ids:
+                cursor.execute('''INSERT INTO Predictions VALUES(?, ?, ?, ?, ?)''',
+                            (user_id, match_id, round_number, None, None))
 
 
 async def update_single_user_multiple_rounds_predictions(session, cursor, user_id, active_round):
@@ -176,6 +179,7 @@ async def update_single_user_multiple_rounds_predictions(session, cursor, user_i
 
     if last_updated_round < active_round:
         tasks = []
+        # have to add the special case of excluding round 50, as that round was voided due to COVID 19
         for round_number in range(last_updated_round+1, active_round):
             tasks.append(update_single_user_single_round_predictions(
                 session, cursor, user_id, round_number))
@@ -238,9 +242,9 @@ async def update_single_user_calculations(cursor, user_id):
         FROM (SELECT * FROM Predictions WHERE user_id = ?) x
         INNER JOIN Results
         ON x.match_id = Results.match_id
-        WHERE (x.home - x.away > 0 AND  Results.home - Results.away > 0
-            OR x.home - x.away = 0 AND  Results.home - Results.away = 0
-            OR x.home - x.away < 0 AND  Results.home - Results.away < 0
+        WHERE ((x.home - x.away > 0 AND  Results.home - Results.away > 0)
+            OR (x.home - x.away = 0 AND  Results.home - Results.away = 0)
+            OR (x.home - x.away < 0 AND  Results.home - Results.away < 0)
             )
             AND (x.home != Results.home OR x.away != Results.away)
     ''', (user_id,)).fetchone()[0]
