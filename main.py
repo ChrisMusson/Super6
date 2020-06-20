@@ -43,8 +43,8 @@ def initialise_database(cursor):
 
     cursor.execute('''
         CREATE TABLE Rounds (
-            match_id int,
-            round_number int
+            round_number int,
+            match_id int
         )
     ''')
 
@@ -89,46 +89,54 @@ async def update_users(session, cursor):
             first_name, last_name = user_data["firstName"], user_data["lastName"]
 
             cursor.execute('''INSERT INTO Users VALUES(?, ?, ?)''',
-                        (user_id, first_name.capitalize(), last_name.capitalize()))
+                           (user_id, first_name.capitalize(), last_name.capitalize()))
         except AssertionError:
-            print(f"The webpage 'https://super6.skysports.com/api/v2/score/leaderboard/user/{user_id}?period=season' could not be reached. This may be because you are not connected to the internet, or because user_id {user_id} is not a valid ID.")
+            print(
+                f"The webpage 'https://super6.skysports.com/api/v2/score/leaderboard/user/{user_id}?period=season' could not be reached. This may be because you are not connected to the internet, or because user_id {user_id} is not a valid ID.")
 
     for user_id in users_to_delete:
         cursor.execute('''
-            DELETE FROM Users 
+            DELETE FROM Users
             WHERE user_id = ?
         ''', (user_id,))
 
         cursor.execute('''
-            DELETE FROM Predictions 
+            DELETE FROM Predictions
             WHERE user_id = ?
         ''', (user_id,))
 
         cursor.execute('''
-            DELETE FROM Calculations 
+            DELETE FROM Calculations
             WHERE user_id = ?
         ''', (user_id,))
 
 
-async def update_single_round_info_and_results(session, cursor, round_number, active_round):
+async def update_single_round_info_and_results(session, cursor, round_number, active_round, in_play):
     # Completely ignore round 50 as that was voided with no points awarded due to COVID 19
     if round_number != 50:
         data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}")
+
+        # deletes entry from results so when this script is used in play, the final table updates in real time
+        if round_number == active_round:
+           if in_play:
+                cursor.execute('''
+                    DELETE FROM Results
+                    WHERE round_number = ?
+                ''', (round_number,))
+
         for match in data["scoreChallenges"]:
             cursor.execute('''
                 INSERT INTO Rounds
                 VALUES (?, ?)
-            ''',
-                        (round_number, match["match"]["id"])
-                        )
-            if round_number != active_round:
-                cursor.execute('''
-                    INSERT INTO Results
-                    VALUES (?, ?, ?, ?)
-                ''', (match["match"]["id"], round_number, match["match"]["homeTeam"]["score"], match["match"]["awayTeam"]["score"]))
+            ''', (round_number, match["match"]["id"]))
+
+            cursor.execute('''
+                INSERT INTO Results
+                VALUES (?, ?, ?, ?)
+            ''', (match["match"]["id"], round_number, match["match"]["homeTeam"]["score"], match["match"]["awayTeam"]["score"]))
 
 
-async def update_multiple_rounds_info_and_results(session, cursor, active_round):
+async def update_multiple_rounds_info_and_results(session, cursor, active_round, in_play):
     last_updated_round = cursor.execute('''
         SELECT MAX(round_number)
         FROM Rounds
@@ -137,13 +145,20 @@ async def update_multiple_rounds_info_and_results(session, cursor, active_round)
     if last_updated_round == None:
         last_updated_round = 0
 
-    if last_updated_round < active_round:
-        tasks = []
-        for round_number in range(last_updated_round+1, active_round+1):
+    tasks = []
+    if in_play:
+        if last_updated_round == 0:
+            last_updated_round = 1
+        for round_number in range(last_updated_round, active_round + 1):
             tasks.append(update_single_round_info_and_results(
-                session, cursor, round_number, active_round))
+                session, cursor, round_number, active_round, in_play))
 
-        return await asyncio.gather(*tasks)
+    else: 
+        for round_number in range(last_updated_round + 1, active_round + 1):
+            tasks.append(update_single_round_info_and_results(
+                session, cursor, round_number, active_round, in_play))
+
+    return await asyncio.gather(*tasks)
 
 
 async def update_single_user_single_round_predictions(session, cursor, user_id, round_number):
@@ -154,7 +169,7 @@ async def update_single_user_single_round_predictions(session, cursor, user_id, 
             for pred in data["predictions"]["scores"]:
                 match_id, home, away = pred["matchId"], pred["scoreHome"], pred["scoreAway"]
                 cursor.execute('''INSERT INTO Predictions VALUES(?, ?, ?, ?, ?)''',
-                            (user_id, match_id, round_number, home, away))
+                               (user_id, match_id, round_number, home, away))
 
         else:
             match_ids = [x[0] for x in cursor.execute('''
@@ -164,7 +179,7 @@ async def update_single_user_single_round_predictions(session, cursor, user_id, 
         ''', (round_number,)).fetchall()]
             for match_id in match_ids:
                 cursor.execute('''INSERT INTO Predictions VALUES(?, ?, ?, ?, ?)''',
-                            (user_id, match_id, round_number, None, None))
+                               (user_id, match_id, round_number, None, None))
 
 
 async def update_single_user_multiple_rounds_predictions(session, cursor, user_id, active_round):
@@ -180,7 +195,7 @@ async def update_single_user_multiple_rounds_predictions(session, cursor, user_i
     if last_updated_round < active_round:
         tasks = []
         # have to add the special case of excluding round 50, as that round was voided due to COVID 19
-        for round_number in range(last_updated_round+1, active_round):
+        for round_number in range(last_updated_round + 1, active_round):
             tasks.append(update_single_user_single_round_predictions(
                 session, cursor, user_id, round_number))
 
@@ -251,7 +266,7 @@ async def update_single_user_calculations(cursor, user_id):
 
     correct_scores = off_by(cursor, user_id, 0)
 
-    points = correct_scores*5 + correct_results*2
+    points = correct_scores * 5 + correct_results * 2
 
     off_by_1 = off_by(cursor, user_id, 1)
     off_by_2 = off_by(cursor, user_id, 2)
@@ -283,6 +298,7 @@ async def update_multiple_user_calculations(cursor):
         tasks.append(update_single_user_calculations(
             cursor, user_id))
     return await asyncio.gather(*tasks)
+
 
 def print_final_table(cursor):
     league_table = cursor.execute('''
@@ -318,6 +334,7 @@ async def main():
     async with aiohttp.ClientSession() as session:
         active_round_info = await fetch(session, "https://super6.skysports.com/api/v2/round/active")
         active_round = active_round_info["id"]
+        in_play = active_round_info["status"] == "inplay"
 
         # check for new ID values in IDs.csv and if any are found, add the ID and corresponding name to the Users table
         await update_users(session, cursor)
@@ -325,10 +342,10 @@ async def main():
         # update the Rounds and Results tables
         # in the case of the Rounds table, this is up to and including active_round
         # in the case of the Results table, this is up to but excluding active_round
-        await update_multiple_rounds_info_and_results(session, cursor, active_round)
+        await update_multiple_rounds_info_and_results(session, cursor, active_round, in_play)
 
         # update the Predictions table
-        await update_multiple_users_multiple_rounds_predictions(session, cursor, active_round)
+        await update_multiple_users_multiple_rounds_predictions(session, cursor, active_round + in_play)
 
     # update the calculations table
     await update_multiple_user_calculations(cursor)
