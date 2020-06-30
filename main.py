@@ -1,6 +1,6 @@
 import sqlite3
 from os import path
-from prettytable import PrettyTable
+from prettytable import from_db_cursor
 import csv
 import aiohttp
 import asyncio
@@ -324,23 +324,15 @@ async def update_multiple_user_calculations(cursor):
 
 
 def print_final_table(cursor):
-    league_table = cursor.execute('''
+    cursor.execute('''
         SELECT *
         FROM Calculations
         ORDER BY points DESC, correct_scores DESC
-    ''').fetchall()
+    ''')
 
-    field_names = [x[0] for x in cursor.execute('''
-        SELECT *
-        FROM Calculations
-    ''').description]
+    league_table = from_db_cursor(cursor)
 
-    pretty_table = PrettyTable()
-    pretty_table.field_names = field_names
-    for x in league_table:
-        pretty_table.add_row(list(x))
-
-    print(pretty_table)
+    print(league_table)
 
 
 async def main():
