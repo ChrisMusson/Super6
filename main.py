@@ -57,6 +57,7 @@ def initialise_database(cursor):
             correct_scores int,
             points int,
             pts_per_round real,
+            variance real,
             off_by_1 int,
             off_by_2 int,
             off_by_3 int,
@@ -275,10 +276,32 @@ async def update_single_user_calculations(cursor, user_id):
 
     pts_per_round = round(points / rounds_played, 2)
 
+    variance = cursor.execute('''
+        SELECT ROUND(AVG(round_score*round_score) - AVG(round_score)*AVG(round_score), 2) variance
+        FROM(
+            SELECT sum(
+                2 * (
+                        (
+                            (x.home - x.away > 0 AND  Results.home - Results.away > 0)
+                        OR (x.home - x.away = 0 AND  Results.home - Results.away = 0)
+                        OR (x.home - x.away < 0 AND  Results.home - Results.away < 0)
+                        )	
+                        AND (x.home != Results.home OR x.away != Results.away)
+                )
+                + 
+                5 * (abs(x.home - Results.home) + abs(x.away - Results.away) = 0)
+            ) round_score
+                        
+            FROM (SELECT * FROM Predictions WHERE user_id = ?) x
+            INNER JOIN Results
+            ON x.match_id = Results.match_id
+            GROUP BY x.round_number)
+    ''', (user_id,)).fetchone()[0]
+
     cursor.execute('''
         INSERT INTO Calculations
-        VALUES (?,?,?,?,?,?,?,?,?,?,?)
-    ''', (user_id, user_name, rounds_played, correct_results, correct_scores, points, pts_per_round, off_by_1, off_by_2, off_by_3, off_by_4_or_more))
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+    ''', (user_id, user_name, rounds_played, correct_results, correct_scores, points, pts_per_round, variance, off_by_1, off_by_2, off_by_3, off_by_4_or_more))
 
 
 async def update_multiple_user_calculations(cursor):
