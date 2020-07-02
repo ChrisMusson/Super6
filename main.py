@@ -51,17 +51,17 @@ def initialise_database(cursor):
     cursor.execute('''
         CREATE TABLE Calculations (
             user_id int,
-            user_name text,
-            rounds_played int,
-            correct_results int,
-            correct_scores int,
+            name text,
+            played int,
+            results int,
+            scores int,
             points int,
             pts_per_round real,
             variance real,
             off_by_1 int,
             off_by_2 int,
             off_by_3 int,
-            off_by_4_or_more int
+            off_by_more int
         )
     ''')
 
@@ -327,7 +327,7 @@ def print_final_table(cursor):
     cursor.execute('''
         SELECT *
         FROM Calculations
-        ORDER BY points DESC, correct_scores DESC
+        ORDER BY points DESC, scores DESC
     ''')
 
     league_table = from_db_cursor(cursor)
