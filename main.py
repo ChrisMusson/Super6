@@ -2,6 +2,7 @@ import sqlite3
 from os import path
 from prettytable import from_db_cursor
 import csv
+import json
 import aiohttp
 import asyncio
 
@@ -10,7 +11,6 @@ async def fetch(session, url):
     async with session.get(url) as resp:
         assert resp.status == 200
         return await resp.json()
-
 
 def initialise_database(cursor):
 
@@ -65,7 +65,6 @@ def initialise_database(cursor):
         )
     ''')
 
-
 async def update_users(session, cursor):
     with open("IDs.csv", "r") as f:
         reader = csv.reader(f)
@@ -111,58 +110,46 @@ async def update_users(session, cursor):
             WHERE user_id = ?
         ''', (user_id,))
 
-
-async def update_single_round_info_and_results(session, cursor, round_number, active_round, in_play):
+async def add_single_round_info_and_results(session, cursor, round_number):
     # Completely ignore round 50 as that was voided with no points awarded due to COVID 19
     if round_number != 50:
         data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}")
 
-        # deletes entry from results so when this script is used in play, the final table updates in real time
-        if round_number == active_round:
-           if in_play:
-                cursor.execute('''
-                    DELETE FROM Results
-                    WHERE round_number = ?
-                ''', (round_number,))
-
         for match in data["scoreChallenges"]:
+            info = match["match"]
+
             cursor.execute('''
                 INSERT INTO Rounds
                 VALUES (?, ?)
-            ''', (round_number, match["match"]["id"]))
+            ''', (round_number, info["id"]))
 
             cursor.execute('''
                 INSERT INTO Results
                 VALUES (?, ?, ?, ?)
-            ''', (match["match"]["id"], round_number, match["match"]["homeTeam"]["score"], match["match"]["awayTeam"]["score"]))
+            ''', (info["id"], round_number, info["homeTeam"]["score"], info["awayTeam"]["score"]))
 
+async def delete_from_rounds(cursor, round_number):
+    cursor.execute('''
+        DELETE FROM Rounds
+        WHERE round_number = ?
+    ''', (round_number,))
 
-async def update_multiple_rounds_info_and_results(session, cursor, active_round, in_play):
-    last_updated_round = cursor.execute('''
-        SELECT MAX(round_number)
-        FROM Rounds
-    ''').fetchone()[0]
+async def delete_from_results(cursor, round_number):
+    cursor.execute('''
+        DELETE FROM Results
+        WHERE round_number = ?
+    ''', (round_number,))
 
-    if last_updated_round == None:
-        last_updated_round = 0
-
+async def add_multiple_rounds_info_and_results(session, cursor, start, end):
     tasks = []
-    if in_play:
-        if last_updated_round == 0:
-            last_updated_round = 1
-        for round_number in range(last_updated_round, active_round + 1):
-            tasks.append(update_single_round_info_and_results(
-                session, cursor, round_number, active_round, in_play))
 
-    else: 
-        for round_number in range(last_updated_round + 1, active_round + 1):
-            tasks.append(update_single_round_info_and_results(
-                session, cursor, round_number, active_round, in_play))
+    for round_number in range(start, end + 1):
+        tasks.append(add_single_round_info_and_results(
+            session, cursor, round_number))
 
     return await asyncio.gather(*tasks)
 
-
-async def update_single_user_single_round_predictions(session, cursor, user_id, round_number):
+async def add_single_user_single_round_predictions(session, cursor, user_id, round_number):
     # Completely ignore round 50 as that was voided with no points awarded due to COVID 19
     if round_number != 50:
         data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}/user/{user_id}")
@@ -182,39 +169,14 @@ async def update_single_user_single_round_predictions(session, cursor, user_id, 
                 cursor.execute('''INSERT INTO Predictions VALUES(?, ?, ?, ?, ?)''',
                                (user_id, match_id, round_number, None, None))
 
-
-async def update_single_user_multiple_rounds_predictions(session, cursor, user_id, active_round):
-    last_updated_round = cursor.execute('''
-        SELECT MAX(round_number)
-        FROM Predictions
-        WHERE user_id = ?
-    ''', (user_id,)).fetchone()[0]
-
-    if last_updated_round == None:
-        last_updated_round = 0
-
-    if last_updated_round < active_round:
-        tasks = []
-        # have to add the special case of excluding round 50, as that round was voided due to COVID 19
-        for round_number in range(last_updated_round + 1, active_round):
-            tasks.append(update_single_user_single_round_predictions(
+async def add_multiple_users_multiple_rounds_predictions(session, cursor, user_ids, start, end):
+    tasks = []
+    for round_number in range(start, end + 1):
+        for user_id in user_ids:
+            tasks.append(add_single_user_single_round_predictions(
                 session, cursor, user_id, round_number))
 
-        return await asyncio.gather(*tasks)
-
-
-async def update_multiple_users_multiple_rounds_predictions(session, cursor, active_round):
-    tasks = []
-    for user_id in [x[0] for x in
-                    cursor.execute('''
-            SELECT user_id
-            FROM Users
-        ''').fetchall()
-                    ]:
-        tasks.append(update_single_user_multiple_rounds_predictions(
-            session, cursor, user_id, active_round))
     return await asyncio.gather(*tasks)
-
 
 def off_by(cursor, user_id, x, exactly=True):
     '''returns how many predictions were wrong by exactly x goals if exactly=True,
@@ -238,8 +200,7 @@ def off_by(cursor, user_id, x, exactly=True):
             WHERE abs(x.home - Results.home) + abs(x.away - Results.away) >= ?
         ''', (user_id, x)).fetchone()[0]
 
-
-async def update_single_user_calculations(cursor, user_id):
+async def add_single_user_calculations(cursor, user_id):
 
     user_name = " ".join(cursor.execute('''
         SELECT first_name, last_name
@@ -303,25 +264,11 @@ async def update_single_user_calculations(cursor, user_id):
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
     ''', (user_id, user_name, rounds_played, correct_results, correct_scores, points, pts_per_round, variance, off_by_1, off_by_2, off_by_3, off_by_4_or_more))
 
-
-async def update_multiple_user_calculations(cursor):
-    # brutish way to make sure records don't get repeated
-    # would be better to check for any changes and if they exist update, else don't
-    cursor.execute('''
-        DELETE FROM Calculations
-    ''')
-
+async def add_multiple_users_calculations(cursor, user_ids):
     tasks = []
-    for user_id in [x[0] for x in
-                    cursor.execute('''
-            SELECT user_id
-            FROM Users
-        ''').fetchall()
-                    ]:
-        tasks.append(update_single_user_calculations(
-            cursor, user_id))
+    for user_id in user_ids:
+        tasks.append(add_single_user_calculations(cursor, user_id))
     return await asyncio.gather(*tasks)
-
 
 def print_final_table(cursor):
     cursor.execute('''
@@ -331,9 +278,9 @@ def print_final_table(cursor):
     ''')
 
     league_table = from_db_cursor(cursor)
+    league_table.float_format = ".2"
 
     print(league_table)
-
 
 async def main():
     # flag to check if database already exists
@@ -346,24 +293,46 @@ async def main():
         # create tables and specify the columns and their datatypes
         initialise_database(cursor)
 
+    with open('last_update.json') as f:
+        last_update = json.load(f)
+
+
     async with aiohttp.ClientSession() as session:
         active_round_info = await fetch(session, "https://super6.skysports.com/api/v2/round/active")
+
         active_round = active_round_info["id"]
         in_play = active_round_info["status"] == "inplay"
+        
 
-        # check for new ID values in IDs.csv and if any are found, add the ID and corresponding name to the Users table
+        # add / delete users from tables based on the IDs in IDs.csv
         await update_users(session, cursor)
 
-        # update the Rounds and Results tables
-        # in the case of the Rounds table, this is up to and including active_round
-        # in the case of the Results table, this is up to but excluding active_round
-        await update_multiple_rounds_info_and_results(session, cursor, active_round, in_play)
+        last_update_round = last_update["round"]
+        last_update_status = last_update["in_play"]
+
+        if last_update_status:
+            await delete_from_results(cursor, last_update_round)
+            await delete_from_rounds(cursor, last_update_round) # not necessary but only a small performance hit and makes the logic easier
+
+        # want to start at the last updated active round only if it was in play when last updated, otherwise the one after
+        # want to end at current active round to database only if the round is currently in play, otherwise the one before
+        await add_multiple_rounds_info_and_results(session, cursor, last_update_round + 1 - last_update_status, active_round - 1 + in_play)
+
+        user_ids = [x[0] for x in cursor.execute('''
+            SELECT user_id
+            FROM Users
+        ''').fetchall()]
 
         # update the Predictions table
-        await update_multiple_users_multiple_rounds_predictions(session, cursor, active_round + in_play)
+        await add_multiple_users_multiple_rounds_predictions(session, cursor, user_ids, last_update_round + 1, active_round - 1 + in_play)
 
-    # update the calculations table
-    await update_multiple_user_calculations(cursor)
+    # brutish way to make sure records don't get repeated
+    # would be better to check for any changes and if they exist update, else don't
+    cursor.execute('''
+        DELETE FROM Calculations
+    ''')
+
+    await add_multiple_users_calculations(cursor, user_ids)
 
     print_final_table(cursor)
 
@@ -371,6 +340,13 @@ async def main():
     connection.commit()
     connection.close()
 
+    with open("last_update.json", "w") as f:
+        json.dump(
+            {
+                "round": active_round,
+                "in_play": in_play
+            }, f
+        )
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
