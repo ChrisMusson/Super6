@@ -12,6 +12,7 @@ async def fetch(session, url):
         assert resp.status == 200
         return await resp.json()
 
+
 def initialise_database(cursor):
 
     cursor.execute('''
@@ -65,6 +66,7 @@ def initialise_database(cursor):
         )
     ''')
 
+
 async def update_users(session, cursor):
     with open("IDs.csv", "r") as f:
         reader = csv.reader(f)
@@ -110,6 +112,7 @@ async def update_users(session, cursor):
             WHERE user_id = ?
         ''', (user_id,))
 
+
 async def add_single_round_info_and_results(session, cursor, round_number):
     # Completely ignore round 50 as that was voided with no points awarded due to COVID 19
     if round_number != 50:
@@ -128,17 +131,20 @@ async def add_single_round_info_and_results(session, cursor, round_number):
                 VALUES (?, ?, ?, ?)
             ''', (info["id"], round_number, info["homeTeam"]["score"], info["awayTeam"]["score"]))
 
+
 async def delete_from_rounds(cursor, round_number):
     cursor.execute('''
         DELETE FROM Rounds
         WHERE round_number = ?
     ''', (round_number,))
 
+
 async def delete_from_results(cursor, round_number):
     cursor.execute('''
         DELETE FROM Results
         WHERE round_number = ?
     ''', (round_number,))
+
 
 async def add_multiple_rounds_info_and_results(session, cursor, start, end):
     tasks = []
@@ -148,6 +154,7 @@ async def add_multiple_rounds_info_and_results(session, cursor, start, end):
             session, cursor, round_number))
 
     return await asyncio.gather(*tasks)
+
 
 async def add_single_user_single_round_predictions(session, cursor, user_id, round_number):
     # Completely ignore round 50 as that was voided with no points awarded due to COVID 19
@@ -169,6 +176,7 @@ async def add_single_user_single_round_predictions(session, cursor, user_id, rou
                 cursor.execute('''INSERT INTO Predictions VALUES(?, ?, ?, ?, ?)''',
                                (user_id, match_id, round_number, None, None))
 
+
 async def add_multiple_users_multiple_rounds_predictions(session, cursor, user_ids, start, end):
     tasks = []
     for round_number in range(start, end + 1):
@@ -177,6 +185,7 @@ async def add_multiple_users_multiple_rounds_predictions(session, cursor, user_i
                 session, cursor, user_id, round_number))
 
     return await asyncio.gather(*tasks)
+
 
 def off_by(cursor, user_id, x, exactly=True):
     '''returns how many predictions were wrong by exactly x goals if exactly=True,
@@ -199,6 +208,7 @@ def off_by(cursor, user_id, x, exactly=True):
             ON x.match_id = Results.match_id
             WHERE abs(x.home - Results.home) + abs(x.away - Results.away) >= ?
         ''', (user_id, x)).fetchone()[0]
+
 
 async def add_single_user_calculations(cursor, user_id):
 
@@ -264,11 +274,13 @@ async def add_single_user_calculations(cursor, user_id):
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
     ''', (user_id, user_name, rounds_played, correct_results, correct_scores, points, pts_per_round, variance, off_by_1, off_by_2, off_by_3, off_by_4_or_more))
 
+
 async def add_multiple_users_calculations(cursor, user_ids):
     tasks = []
     for user_id in user_ids:
         tasks.append(add_single_user_calculations(cursor, user_id))
     return await asyncio.gather(*tasks)
+
 
 def print_final_table(cursor):
     cursor.execute('''
@@ -281,6 +293,7 @@ def print_final_table(cursor):
     league_table.float_format = ".2"
 
     print(league_table)
+
 
 async def main():
     # flag to check if database already exists
@@ -296,13 +309,11 @@ async def main():
     with open('last_update.json') as f:
         last_update = json.load(f)
 
-
     async with aiohttp.ClientSession() as session:
         active_round_info = await fetch(session, "https://super6.skysports.com/api/v2/round/active")
 
         active_round = active_round_info["id"]
         in_play = active_round_info["status"] == "inplay"
-        
 
         # add / delete users from tables based on the IDs in IDs.csv
         await update_users(session, cursor)
@@ -311,19 +322,20 @@ async def main():
         last_update_status = last_update["in_play"]
 
         if last_update_status:
+            # neither of these are necessary but it's only a small performance hit and makes the logic easier
             await delete_from_results(cursor, last_updated_round)
-            await delete_from_rounds(cursor, last_updated_round) # neither of these are necessary but it's only a small performance hit and makes the logic easier
+            await delete_from_rounds(cursor, last_updated_round)
 
         # always want to start at the last updated round as that has just been deleted from both tables
         # want to end at current active round only if the round is currently in play, otherwise the one before
         await add_multiple_rounds_info_and_results(session, cursor, last_updated_round, active_round - 1 + in_play)
-    
+
         user_ids = [x[0] for x in cursor.execute('''
             SELECT user_id
             FROM Users
         ''').fetchall()]
 
-        # logic to decide if the predictions table needs to be updated. If it does,update it
+        # logic to decide if the predictions table needs to be updated. If it does, update it
         if last_updated_round + last_update_status < active_round + in_play:
             await add_multiple_users_multiple_rounds_predictions(session, cursor, user_ids, last_updated_round + last_update_status, active_round - 1 + in_play)
 
