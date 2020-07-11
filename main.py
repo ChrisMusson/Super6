@@ -307,31 +307,30 @@ async def main():
         # add / delete users from tables based on the IDs in IDs.csv
         await update_users(session, cursor)
 
-        last_update_round = last_update["round"]
+        last_updated_round = last_update["round"]
         last_update_status = last_update["in_play"]
 
         if last_update_status:
-            await delete_from_results(cursor, last_update_round)
-            await delete_from_rounds(cursor, last_update_round) # not necessary but only a small performance hit and makes the logic easier
+            await delete_from_results(cursor, last_updated_round)
+            await delete_from_rounds(cursor, last_updated_round) # neither of these are necessary but it's only a small performance hit and makes the logic easier
 
-        # want to start at the last updated active round only if it was in play when last updated, otherwise the one after
-        # want to end at current active round to database only if the round is currently in play, otherwise the one before
-        await add_multiple_rounds_info_and_results(session, cursor, last_update_round + 1 - last_update_status, active_round - 1 + in_play)
-
+        # always want to start at the last updated round as that has just been deleted from both tables
+        # want to end at current active round only if the round is currently in play, otherwise the one before
+        await add_multiple_rounds_info_and_results(session, cursor, last_updated_round, active_round - 1 + in_play)
+    
         user_ids = [x[0] for x in cursor.execute('''
             SELECT user_id
             FROM Users
         ''').fetchall()]
 
-        # update the Predictions table
-        await add_multiple_users_multiple_rounds_predictions(session, cursor, user_ids, last_update_round + 1, active_round - 1 + in_play)
+        # logic to decide if the predictions table needs to be updated. If it does,update it
+        if last_updated_round + last_update_status < active_round + in_play:
+            await add_multiple_users_multiple_rounds_predictions(session, cursor, user_ids, last_updated_round + last_update_status, active_round - 1 + in_play)
 
-    # brutish way to make sure records don't get repeated
-    # would be better to check for any changes and if they exist update, else don't
+    # recalculate everything in calculations table with new results/predictions
     cursor.execute('''
         DELETE FROM Calculations
     ''')
-
     await add_multiple_users_calculations(cursor, user_ids)
 
     print_final_table(cursor)
