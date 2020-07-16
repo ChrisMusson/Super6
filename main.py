@@ -67,7 +67,7 @@ def initialise_database(cursor):
     ''')
 
 
-async def update_users(session, cursor):
+async def update_users(session, cursor, last_updated_round, exists, in_play):
     with open("IDs.csv", "r") as f:
         reader = csv.reader(f)
         IDs_from_file = [int(ID.strip()) for ID in next(reader)]
@@ -92,6 +92,12 @@ async def update_users(session, cursor):
 
             cursor.execute('''INSERT INTO Users VALUES(?, ?, ?)''',
                            (user_id, first_name.capitalize(), last_name.capitalize()))
+            
+            # update predictions so that everyone is at the same point
+            # only want to do this if the database already exists with users in it - otherwise the usual logic will take care of it
+            if exists:
+                await add_multiple_users_multiple_rounds_predictions(session, cursor, [user_id], 1, last_updated_round - 1 + in_play)
+
         except AssertionError:
             print(
                 f"The webpage 'https://super6.skysports.com/api/v2/score/leaderboard/user/{user_id}?period=season' could not be reached. This may be because you are not connected to the internet, or because user_id {user_id} is not a valid ID.")
@@ -315,8 +321,11 @@ async def main():
         active_round = active_round_info["id"]
         in_play = active_round_info["status"] == "inplay"
 
-        # add / delete users from tables based on the IDs in IDs.csv
-        await update_users(session, cursor)
+        last_updated_round = last_update["round"]
+        last_update_status = last_update["in_play"]
+        
+        # add / delete users from tables based on the IDs in IDs.csv and update newly added users to the same point as everyone else
+        await update_users(session, cursor, last_updated_round, exists, in_play)
 
         last_updated_round = last_update["round"]
         last_update_status = last_update["in_play"]

@@ -7,4 +7,4 @@ Super 6 is a football prediction game run by Sky Sports for players based in the
 3. Edit `IDs.csv` to include all the IDs you want to be in your final database. These can be found by going to your desired person's results for any round. The value for that user's user ID is the 8 digit number found in the URL. The two user IDs that are currently in `IDs.csv` are my personal ID and the ID of another account I own for testing purposes. Feel free to delete both of these, they are only there to show the format of an example csv.
 4. Run `main.py`. This will create a database `database.db` that has all the data from every ID you included in the `IDs.csv` file and will print out the `Calculations` table to the command line.
 
-If you want to change the users in your database, the best way of doing that currently is to update `IDs.csv`, delete the `database.db` file, and run `main.py` again. 
+To change the users in your database after it has already been created, simply adding/removing the user ID from `IDs.csv` and running `main.py` again will do that for you.
