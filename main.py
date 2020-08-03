@@ -319,7 +319,7 @@ async def main():
         active_round_info = await fetch(session, "https://super6.skysports.com/api/v2/round/active")
 
         active_round = active_round_info["id"]
-        in_play = active_round_info["status"] == "inplay"
+        in_play = active_round_info["status"] in ["inplay", "complete"]
 
         last_updated_round = last_update["round"]
         last_update_status = last_update["in_play"]
