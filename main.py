@@ -251,7 +251,10 @@ async def add_single_user_calculations(cursor, user_id):
     off_by_3 = off_by(cursor, user_id, 3)
     off_by_4_or_more = off_by(cursor, user_id, 4, exactly=False)
 
-    pts_per_round = round(points / rounds_played, 2)
+    if rounds_played > 0:
+        pts_per_round = round(points / rounds_played, 2)
+    else:
+        pts_per_round = 0
 
     variance = cursor.execute('''
         SELECT ROUND(AVG(round_score*round_score) - AVG(round_score)*AVG(round_score), 2) variance
