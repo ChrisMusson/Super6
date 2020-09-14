@@ -314,9 +314,12 @@ async def main():
     if not exists:
         # create tables and specify the columns and their datatypes
         initialise_database(cursor)
-
-    with open('last_update.json') as f:
-        last_update = json.load(f)
+        # set the last_update to the initial conditions so the program runs all the way from gameweek 1
+        # this is useful if the database file accidentally ever gets deleted or lost
+        last_update = {"round": 1, "in_play": False}
+    else:
+        with open('last_update.json') as f:
+            last_update = json.load(f)
 
     async with aiohttp.ClientSession() as session:
         active_round_info = await fetch(session, "https://super6.skysports.com/api/v2/round/active")
