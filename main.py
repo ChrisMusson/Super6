@@ -120,22 +120,20 @@ async def update_users(session, cursor, last_updated_round, exists, in_play):
 
 
 async def add_single_round_info_and_results(session, cursor, round_number):
-    # Completely ignore round 50 as that was voided with no points awarded due to COVID 19
-    if round_number != 50:
-        data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}")
+    data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}")
 
-        for match in data["scoreChallenges"]:
-            info = match["match"]
+    for match in data["scoreChallenges"]:
+        info = match["match"]
 
-            cursor.execute('''
-                INSERT INTO Rounds
-                VALUES (?, ?)
-            ''', (round_number, info["id"]))
+        cursor.execute('''
+            INSERT INTO Rounds
+            VALUES (?, ?)
+        ''', (round_number, info["id"]))
 
-            cursor.execute('''
-                INSERT INTO Results
-                VALUES (?, ?, ?, ?)
-            ''', (info["id"], round_number, info["homeTeam"]["score"], info["awayTeam"]["score"]))
+        cursor.execute('''
+            INSERT INTO Results
+            VALUES (?, ?, ?, ?)
+        ''', (info["id"], round_number, info["homeTeam"]["score"], info["awayTeam"]["score"]))
 
 
 async def delete_from_rounds(cursor, round_number):
@@ -163,24 +161,22 @@ async def add_multiple_rounds_info_and_results(session, cursor, start, end):
 
 
 async def add_single_user_single_round_predictions(session, cursor, user_id, round_number):
-    # Completely ignore round 50 as that was voided with no points awarded due to COVID 19
-    if round_number != 50:
-        data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}/user/{user_id}")
-        if data["hasPredicted"]:
-            for pred in data["predictions"]["scores"]:
-                match_id, home, away = pred["matchId"], pred["scoreHome"], pred["scoreAway"]
-                cursor.execute('''INSERT INTO Predictions VALUES(?, ?, ?, ?, ?)''',
-                               (user_id, match_id, round_number, home, away))
+    data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}/user/{user_id}")
+    if data["hasPredicted"]:
+        for pred in data["predictions"]["scores"]:
+            match_id, home, away = pred["matchId"], pred["scoreHome"], pred["scoreAway"]
+            cursor.execute('''INSERT INTO Predictions VALUES(?, ?, ?, ?, ?)''',
+                            (user_id, match_id, round_number, home, away))
 
-        else:
-            match_ids = [x[0] for x in cursor.execute('''
-            SELECT match_id
-            FROM Rounds
-            WHERE round_number == ?
-        ''', (round_number,)).fetchall()]
-            for match_id in match_ids:
-                cursor.execute('''INSERT INTO Predictions VALUES(?, ?, ?, ?, ?)''',
-                               (user_id, match_id, round_number, None, None))
+    else:
+        match_ids = [x[0] for x in cursor.execute('''
+        SELECT match_id
+        FROM Rounds
+        WHERE round_number == ?
+    ''', (round_number,)).fetchall()]
+        for match_id in match_ids:
+            cursor.execute('''INSERT INTO Predictions VALUES(?, ?, ?, ?, ?)''',
+                            (user_id, match_id, round_number, None, None))
 
 
 async def add_multiple_users_multiple_rounds_predictions(session, cursor, user_ids, start, end):
