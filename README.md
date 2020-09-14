@@ -10,6 +10,8 @@ Super 6 is a football prediction game run by Sky Sports for players based in the
 
 To change the users in your database after it has already been created, simply adding/removing the user ID from `IDs.csv` and running `main.py` again will do that for you.
 
+If you delete your database file at any point, then running `main.py` again will automatically fix `last_update.json` for you and will give the correct league table.
+
 # Example
 Here is an example of the printed league table (with names and IDs omitted)
 ```+----------+------+--------+---------+--------+--------+---------------+----------+----------+----------+----------+-------------+
@@ -30,4 +32,5 @@ Here is an example of the printed league table (with names and IDs omitted)
 | 1598XXXX | T S  |   40   |    88   |   18   |  266   |      6.65     |  10.23   |    85    |    59    |    49    |      29     |
 | 1671XXXX | D R  |   36   |    73   |   19   |  241   |      6.69     |  11.77   |    67    |    68    |    38    |      24     |
 | 1445XXXX | A C  |   33   |    68   |   15   |  211   |      6.39     |  13.69   |    53    |    72    |    38    |      20     |
-+----------+------+--------+---------+--------+--------+---------------+----------+----------+----------+----------+-------------+```
++----------+------+--------+---------+--------+--------+---------------+----------+----------+----------+----------+-------------+
+```
