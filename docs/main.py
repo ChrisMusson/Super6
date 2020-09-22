@@ -290,7 +290,7 @@ async def add_multiple_users_calculations(cursor, user_ids):
 def write_html_to_file(cursor):
     # there should be a more elegant way of doing this than manually creating the html file myself
     cursor.execute('''
-        SELECT *
+        SELECT RANK () OVER (ORDER BY points DESC) as pos, name, played, results, scores, points, pts_per_round as `pts per round`, variance, off_by_1 as `off by 1`, off_by_2 as `off by 2`, off_by_3 as `off by 3`, off_by_more as `off by 4+`
         FROM Calculations
         ORDER BY points DESC, scores DESC
     ''')
