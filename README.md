@@ -1,6 +1,6 @@
 
 # Super 6
-Super 6 is a football prediction game run by Sky Sports for players based in the UK and the Republic of Ireland. Every week, 6 matches are chosen and the aim is to predict the correct score for all 6 of these games. You can also join a league with friends, and gain points by either predicting the correct score (5 points), or predicting the correct result but not the correct score (2 points). The files in this repository give a database containing data for the players in your `IDs.csv` file. The `Calculations` table gives an extended league table compared to what is found on the Super 6 website, including columns such as rounds played, average points per round, variation, and how many times you were off by 1, 2, 3, etc. goals. Finally, an ASCII table representing this data is printed out to the command line. I have also included an example webpage that can be made from this data in `example/`
+Super 6 is a football prediction game run by Sky Sports for players based in the UK and the Republic of Ireland. Every week, 6 matches are chosen and the aim is to predict the correct score for all 6 of these games. You can also join a league with friends, and gain points by either predicting the correct score (5 points), or predicting the correct result but not the correct score (2 points). The files in this repository give a database containing data for the players in your `IDs.csv` file. The `Calculations` table gives an extended league table compared to what is found on the Super 6 website, including columns such as rounds played, average points per round, variation, and how many times you were off by 1, 2, 3, etc. goals. Finally, an ASCII table representing this data is printed out to the command line. I have also included an example webpage that can easily be made from this data in `docs/`.
 
 # Usage
 1. Clone this repository `git clone "https://github.com/ChrisMusson/Super6"`
@@ -8,7 +8,7 @@ Super 6 is a football prediction game run by Sky Sports for players based in the
 1. Edit `IDs.csv` to include all the IDs you want to be in your final database. 
     1. Doing this manually, these can be found by going to your desired people's results for any round. The value for that user's user ID is the 8 digit number found in the URL.
 
-    1. If there are lots of people in your league and you want this automated, then log in to super 6 and navigate to the desired league's page. From there, open the developer console (F12), paste the contents of `get_IDs.js` in, and press enter. This should log a list of all user IDs in the leeague which can then be pasted into `IDs.csv`. 
+    1. If there are lots of people in your league and you want this automated, then log in to super 6 and navigate to the desired league's page. From there, open the developer console (F12), paste the contents of `get_IDs.js` in, and press enter. This should log a list of all user IDs in the league which can then be pasted into `IDs.csv`. Note that in the final webpage, only the top 50 players will be shown.
     
  The two user IDs that are currently in the file are my personal ID and the ID of another account I own for testing purposes. Feel free to delete both of these, they are only there to show the format of an example csv.
 
