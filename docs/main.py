@@ -295,6 +295,21 @@ def write_html_to_file(cursor):
         ORDER BY points DESC, scores DESC
     ''')
 
+    col_names = [description[0] for description in cursor.description]
+    descriptions = {
+        "pos": "Position in the league table",
+        "name": "User's name",
+        "played": "Rounds entered",
+        "results": "Correct results",
+        "scores": "Correct scores",
+        "points": "Total points",
+        "pts per round": "Points per round played",
+        "variance": "Variance - a measure of consistency. Low variance = consistent",
+        "off by 1": "The number of times a user's prediction was off by exactly 1 goal",
+        "off by 2": "The number of times a user's prediction was off by exactly 2 goals",
+        "off by 3": "The number of times a user's prediction was off by exactly 3 goals",
+        "off by 4+": "The number of times a user's prediction was off by at least 4 goals"
+    }
     league_table = from_db_cursor(cursor, start=0, end=50)
     league_table.float_format = ".2"
 
@@ -307,7 +322,7 @@ def write_html_to_file(cursor):
         b = html.split("<th>")
         full_html = b[0]
         for i, h in enumerate(b[1:]):
-            h = f"<th onclick=\"sortTable({i})\">" + h
+            h = f"<th title=\"{descriptions[col_names[i]]}\" onclick=\"sortTable({i})\">" + h
             full_html += h
 
     with open("index.html", "w") as f:
