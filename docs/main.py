@@ -71,6 +71,8 @@ async def update_users(session, cursor, last_updated_round, exists, in_play):
     with open("IDs.csv", "r") as f:
         reader = csv.reader(f)
         IDs_from_file = [int(ID.strip()) for ID in next(reader)]
+        if len(IDs_from_file) > 50:
+            IDs_from_file = IDs_from_file[:50]
 
     IDs_from_database = [x[0] for x in
                          cursor.execute('''
