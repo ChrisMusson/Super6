@@ -1,6 +1,6 @@
 
 # Super 6
-Super 6 is a football prediction game run by Sky Sports for players based in the UK and the Republic of Ireland. Every week, 6 matches are chosen and the aim is to predict the correct score for all 6 of these games. You can also join a league with friends, and gain points by either predicting the correct score (5 points), or predicting the correct result but not the correct score (2 points). The files in this repository give a database containing data for the players in your `IDs.csv` file. The `Calculations` table gives an extended league table compared to what is found on the Super 6 website, including columns such as rounds played, average points per round, variation, and how many times you were off by 1, 2, 3, etc. goals. Finally, an ASCII table representing this data is printed out to the command line. I have also included an example webpage that can easily be made from this data in `docs/`, that can be found at https://chrismusson.github.io/Super6/
+Super 6 is a football prediction game run by Sky Sports for players based in the UK and the Republic of Ireland. Every week, 6 matches are chosen and the aim is to predict the correct score for all 6 of these games. You can also join a league with friends, and gain points by either predicting the correct score (5 points), or predicting the correct result but not the correct score (2 points). The files in this repository give a database containing data for the players in your `IDs.csv` file. The `Calculations` table gives an extended league table compared to what is found on the Super 6 website, including columns such as rounds played, average points per round, variance, and how many times you were off by 1, 2, 3, etc. goals. Finally, an ASCII table representing this data is printed out to the command line. In `docs/`, I have also included an example webpage that can easily be made from this data. This webpage can be found at https://chrismusson.github.io/Super6/
 
 # Usage
 1. Clone this repository `git clone "https://github.com/ChrisMusson/Super6"`
@@ -8,12 +8,12 @@ Super 6 is a football prediction game run by Sky Sports for players based in the
 1. Edit `IDs.csv` to include all the IDs you want to be in your final database. 
     1. Doing this manually, these can be found by going to your desired people's results for any round. The value for that user's user ID is the 8 digit number found in the URL.
 
-    1. If there are lots of people in your league and you want this automated, then log in to super 6 and navigate to the desired league's page. From there, open the developer console (F12), paste the contents of `get_IDs.js` in, and press enter. This should log a list of all user IDs in the league which can then be pasted into `IDs.csv`. Note that in the final webpage, only (up to) the first 50 IDs in `IDs.csv` will be shown.
+    1. If there are lots of people in your league and you want this automated, then you can call the `get_ids.py` program to fetch all IDs in a league. The syntax to do this is `python get_IDs.py <username> <pin> <league_id>`. This will overwrite the IDs in the current `Ids.csv` file.
     
  The two user IDs that are currently in the file are my personal ID and the ID of another account I own for testing purposes. Feel free to delete both of these, they are only there to show the format of an example csv.
 
  The easiest way to find you own user ID is to navigate to https://super6.skysports.com/refer-a-friend/ , go to the dev console again, and search (ctrl + F) the elements tab for `"Play super6"`. You will get something like `Play Super6 for free for a chance to win the jackpot! https://super6.skysports.com/?referrer=15977871` returned - your ID is the 8 digit number at the end of the link. Make sure to add this ID to the front of the IDs csv to ensure that you are included in the final table.
- 
+
 1. Run `main.py`. This will create a database `database.db` that has all the data from every ID you included in the `IDs.csv` file and will print out the `Calculations` table to the command line. Alternatively, you can use this database file as the datasource for a webpage, as shown in `example/`.
 
 To change the users in your database after it has already been created, simply adding/removing the user ID from `IDs.csv` and running `main.py` again will do that for you.
