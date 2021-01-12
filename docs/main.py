@@ -124,16 +124,19 @@ async def add_single_round_info_and_results(session, cursor, round_number):
 
     for match in data["scoreChallenges"]:
         info = match["match"]
+        # don't want to take into account matches that are yet to go live on occasions where a round
+        # happens over multiple times. Also, the status stays this way when a game gets cancelled
+        if info["status"] != "Pre Live":
 
-        cursor.execute('''
-            INSERT INTO Rounds
-            VALUES (?, ?)
-        ''', (round_number, info["id"]))
+            cursor.execute('''
+                INSERT INTO Rounds
+                VALUES (?, ?)
+            ''', (round_number, info["id"]))
 
-        cursor.execute('''
-            INSERT INTO Results
-            VALUES (?, ?, ?, ?)
-        ''', (info["id"], round_number, info["homeTeam"]["score"], info["awayTeam"]["score"]))
+            cursor.execute('''
+                INSERT INTO Results
+                VALUES (?, ?, ?, ?)
+            ''', (info["id"], round_number, info["homeTeam"]["score"], info["awayTeam"]["score"]))
 
 
 async def delete_from_rounds(cursor, round_number):
