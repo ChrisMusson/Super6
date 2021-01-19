@@ -126,7 +126,7 @@ async def add_single_round_info_and_results(session, cursor, round_number):
         info = match["match"]
         # don't want to take into account matches that are yet to go live on occasions where a round
         # happens over multiple times. Also, the status stays this way when a game gets cancelled
-        if info["status"] != "Pre Live":
+        if info["status"].lower() not in ["pre live", "postponed"]:
 
             cursor.execute('''
                 INSERT INTO Rounds
