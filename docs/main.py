@@ -120,13 +120,14 @@ async def update_users(session, cursor, last_updated_round, exists, in_play):
 
 
 async def add_single_round_info_and_results(session, cursor, round_number):
+    ignored_matches = [65296]
     data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}")
 
     for match in data["scoreChallenges"]:
         info = match["match"]
         # don't want to take into account matches that are yet to go live on occasions where a round
-        # happens over multiple times. Also, the status stays this way when a game gets cancelled
-        if info["status"].lower() not in ["pre live", "postponed"]:
+        # happens over multiple times, or when a game is postponed.
+        if info["status"].lower() not in ["pre live", "postponed"] and int(info["id"]) not in ignored_matches:
 
             cursor.execute('''
                 INSERT INTO Rounds
