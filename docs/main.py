@@ -26,7 +26,7 @@ def initialise_database(cursor):
     cursor.execute('''
         CREATE TABLE Predictions (
             user_id int,
-            match_id int,
+            challenge_id int,
             round_number int,
             home int,
             away int
@@ -35,7 +35,7 @@ def initialise_database(cursor):
 
     cursor.execute('''
         CREATE TABLE Results (
-            match_id int,
+            challenge_id int,
             round_number int,
             home int,
             away int
@@ -45,7 +45,7 @@ def initialise_database(cursor):
     cursor.execute('''
         CREATE TABLE Rounds (
             round_number int,
-            match_id int
+            challenge_id int
         )
     ''')
 
@@ -120,24 +120,29 @@ async def update_users(session, cursor, last_updated_round, exists, in_play):
 
 
 async def add_single_round_info_and_results(session, cursor, round_number):
-    ignored_matches = [65296]
+    # these are generally matches that have been postponed at one point then replayed at a 
+    # later date. The challenge ID must be used as it is unique, whereas the match ID gets
+    # reused when the game gets replayed
+    ignored_challenges = [440, 482, 519, 539, 602]
+
     data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}")
 
     for match in data["scoreChallenges"]:
+        challenge_id = match["id"]
         info = match["match"]
         # don't want to take into account matches that are yet to go live on occasions where a round
-        # happens over multiple times, or when a game is postponed.
-        if info["status"].lower() not in ["pre live", "postponed"] and int(info["id"]) not in ignored_matches:
+        # happens over multiple times, or matches that are postponed.
+        if info["status"] != "Pre Live" and challenge_id not in ignored_challenges:
 
             cursor.execute('''
                 INSERT INTO Rounds
                 VALUES (?, ?)
-            ''', (round_number, info["id"]))
+            ''', (round_number, challenge_id))
 
             cursor.execute('''
                 INSERT INTO Results
                 VALUES (?, ?, ?, ?)
-            ''', (info["id"], round_number, info["homeTeam"]["score"], info["awayTeam"]["score"]))
+            ''', (challenge_id, round_number, info["homeTeam"]["score"], info["awayTeam"]["score"]))
 
 
 async def delete_from_rounds(cursor, round_number):
@@ -168,19 +173,19 @@ async def add_single_user_single_round_predictions(session, cursor, user_id, rou
     data = await fetch(session, f"https://super6.skysports.com/api/v2/round/{round_number}/user/{user_id}")
     if data["hasPredicted"]:
         for pred in data["predictions"]["scores"]:
-            match_id, home, away = pred["matchId"], pred["scoreHome"], pred["scoreAway"]
+            challenge_id, home, away = pred["challengeId"], pred["scoreHome"], pred["scoreAway"]
             cursor.execute('''INSERT INTO Predictions VALUES(?, ?, ?, ?, ?)''',
-                            (user_id, match_id, round_number, home, away))
+                            (user_id, challenge_id, round_number, home, away))
 
     else:
-        match_ids = [x[0] for x in cursor.execute('''
-        SELECT match_id
+        challenge_ids = [x[0] for x in cursor.execute('''
+        SELECT challenge_id
         FROM Rounds
         WHERE round_number == ?
     ''', (round_number,)).fetchall()]
-        for match_id in match_ids:
+        for challenge_id in challenge_ids:
             cursor.execute('''INSERT INTO Predictions VALUES(?, ?, ?, ?, ?)''',
-                            (user_id, match_id, round_number, None, None))
+                            (user_id, challenge_id, round_number, None, None))
 
 
 async def add_multiple_users_multiple_rounds_predictions(session, cursor, user_ids, start, end):
@@ -202,7 +207,7 @@ def off_by(cursor, user_id, x, exactly=True):
             SELECT count(*)
             FROM (SELECT * FROM Predictions WHERE user_id = ?) x
             INNER JOIN Results
-            ON x.match_id = Results.match_id
+            ON x.challenge_id = Results.challenge_id
             WHERE abs(x.home - Results.home) + abs(x.away - Results.away) = ?
         ''', (user_id, x)).fetchone()[0]
 
@@ -211,7 +216,7 @@ def off_by(cursor, user_id, x, exactly=True):
             SELECT count(*)
             FROM (SELECT * FROM Predictions WHERE user_id = ?) x
             INNER JOIN Results
-            ON x.match_id = Results.match_id
+            ON x.challenge_id = Results.challenge_id
             WHERE abs(x.home - Results.home) + abs(x.away - Results.away) >= ?
         ''', (user_id, x)).fetchone()[0]
 
@@ -234,7 +239,7 @@ async def add_single_user_calculations(cursor, user_id):
         SELECT count(*)
         FROM (SELECT * FROM Predictions WHERE user_id = ?) x
         INNER JOIN Results
-        ON x.match_id = Results.match_id
+        ON x.challenge_id = Results.challenge_id
         WHERE ((x.home - x.away > 0 AND  Results.home - Results.away > 0)
             OR (x.home - x.away = 0 AND  Results.home - Results.away = 0)
             OR (x.home - x.away < 0 AND  Results.home - Results.away < 0)
@@ -274,7 +279,7 @@ async def add_single_user_calculations(cursor, user_id):
                         
             FROM (SELECT * FROM Predictions WHERE user_id = ?) x
             INNER JOIN Results
-            ON x.match_id = Results.match_id
+            ON x.challenge_id = Results.challenge_id
             GROUP BY x.round_number)
     ''', (user_id,)).fetchone()[0]
 
