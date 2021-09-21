@@ -1,8 +1,11 @@
 import csv
-import json
 import requests
 import sys
 
+try:
+    import simplejson as json
+except:
+    import json
 
 def get_user_IDs(username, pin, league_id):
     with requests.Session() as s:
@@ -26,9 +29,10 @@ def get_user_IDs(username, pin, league_id):
             try:
                 url = f"https://api.s6.sbgservices.com/v2/score/league/{league_id}?period=season&page={page}"
                 user_data = s.get(url, headers=headers).json()
-                all_ids += [x["userId"] for x in user_data]
+                for user in user_data:
+                    all_ids.append(user["userId"])
                 page += 1
-            except json.decoder.JSONDecodeError:
+            except (json.decoder.JSONDecodeError, json.errors.JSONDecodeError):
                 if page == 1:
                     print("\nThere was a problem getting data from the specified league ID\n")
                     sys.exit(1)
