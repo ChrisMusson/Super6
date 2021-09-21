@@ -33,9 +33,9 @@ def is_in_past(dt: str) -> bool:
     return datetime.strptime(dt, r"%Y-%m-%dT%H:%M:%S.000Z") < datetime.now()
 
 
-def read_ids_from_file(file: str = "IDs.csv") -> List[int]:
-    '''Returns a list of the user_ids found in {file}.csv'''
+def read_from_csv(file: str) -> List[int]:
+    '''Returns a list of the numbers found in {file}.csv'''
 
-    with open(file, "r") as f:
+    with open(f"{file}.csv", "r") as f:
         reader = csv.reader(f)
         return [int(ID.strip()) for ID in next(reader)]
