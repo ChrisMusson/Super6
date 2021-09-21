@@ -51,7 +51,7 @@ class Super6:
             API_URLS["prediction"].format(round_number, user_id)
         )
 
-        if not data["hasPredicted"]:
+        if data is None or not data["hasPredicted"]:
             return []
 
         return [

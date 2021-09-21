@@ -18,8 +18,7 @@ async def fetch(
     retries_count = 0
     while True:
         async with session.get(url) as response:
-            result = await response.json()
-            return result
+            return await response.json()
         retries_count += 1
         if retries_count > retries:
             raise Exception(f"Could not fetch {url} after {retries} retries")
