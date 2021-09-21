@@ -122,14 +122,27 @@ def insert_into_results(cursor: sqlite3.Cursor, results: List[Result]) -> None:
     ''', results)
 
 
-def delete_from_results(cursor: sqlite3.Cursor, round_numbers: List[int]) -> None:
-    '''Deletes result data for multiple round_numbers from the Results table'''
+def delete_from_results(
+        cursor: sqlite3.Cursor,
+        round_numbers: List[int] = None,
+        challenge_ids: List[int] = None
+    ) -> None:
+    '''Deletes result data for multiple round_numbers and/or challenge_ids from the Results table'''
 
-    round_numbers = [(x,) for x in round_numbers]
-    cursor.executemany('''
-        DELETE FROM Results
-        WHERE round_number = ?
-    ''', round_numbers)
+    if round_numbers is not None:
+        round_numbers = [(x,) for x in round_numbers]
+        cursor.executemany('''
+            DELETE FROM Results
+            WHERE round_number = ?
+        ''', round_numbers)
+
+    if challenge_ids is not None:
+        challenge_ids = [(x,) for x in challenge_ids]
+        cursor.executemany('''
+            DELETE FROM Results
+            WHERE challenge_id = ?
+        ''', challenge_ids)
+
 
 
 def insert_into_predictions(cursor: sqlite3.Cursor, predictions: List[Prediction]) -> None:
