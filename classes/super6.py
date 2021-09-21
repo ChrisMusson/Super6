@@ -23,6 +23,9 @@ class Super6:
             if not exists:
                 initialise_database(cursor)
 
+        ignored = read_from_csv("ignored_challenge_ids")
+        delete_from_results(cursor, challenge_ids=ignored)
+
     async def get_results(self, round_number: int) -> List[Result]:
         '''Returns a list of Result objects from the specified round number'''
 
@@ -175,7 +178,7 @@ class Super6:
             cursor = conn.cursor()
 
             IDs_db = read_ids_from_db(cursor)
-            IDs_file = read_ids_from_file()
+            IDs_file = read_from_csv("IDs")
 
             to_add = [x for x in IDs_file if x not in IDs_db]
             to_delete = [x for x in IDs_db if x not in IDs_file]
